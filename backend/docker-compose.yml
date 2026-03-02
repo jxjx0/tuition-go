@@ -1,0 +1,141 @@
+services:
+  # ==================== KONG GATEWAY ====================
+  kong:
+    build:
+      context: ./kong-gateway
+      dockerfile: Dockerfile
+    container_name: kong-gateway
+    ports:
+      - "8000:8000"   # Proxy
+      - "8001:8001"   # Admin API
+      - "8002:8002"   # Admin GUI
+    networks:
+      - tuition-network
+    depends_on:
+      - student
+      - tutor
+      - session
+      - meeting
+      - calendar
+      - email
+      - payment
+      - book-session
+      - cancel-session
+      - rate-tutor
+    restart: unless-stopped
+
+  # ==================== ATOMIC SERVICES ====================
+  student:
+    build:
+      context: ./atomic/student
+      dockerfile: Dockerfile
+    container_name: student-service
+    ports:
+      - "5001:5001"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  tutor:
+    build:
+      context: ./atomic/tutor
+      dockerfile: Dockerfile
+    container_name: tutor-service
+    ports:
+      - "5002:5002"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  session:
+    build:
+      context: ./atomic/session
+      dockerfile: Dockerfile
+    container_name: session-service
+    ports:
+      - "5003:5003"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  meeting:
+    build:
+      context: ./atomic/meeting
+      dockerfile: Dockerfile
+    container_name: meeting-service
+    ports:
+      - "5004:5004"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  calendar:
+    build:
+      context: ./atomic/calendar
+      dockerfile: Dockerfile
+    container_name: calendar-service
+    ports:
+      - "5005:5005"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  email:
+    build:
+      context: ./atomic/email
+      dockerfile: Dockerfile
+    container_name: email-service
+    ports:
+      - "5006:5006"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  payment:
+    build:
+      context: ./atomic/payment
+      dockerfile: Dockerfile
+    container_name: payment-service
+    ports:
+      - "5007:5007"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  # ==================== COMPOSITE SERVICES ====================
+  book-session:
+    build:
+      context: ./composite/book_session
+      dockerfile: Dockerfile
+    container_name: book-session-service
+    ports:
+      - "5100:5100"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  cancel-session:
+    build:
+      context: ./composite/cancel_session
+      dockerfile: Dockerfile
+    container_name: cancel-session-service
+    ports:
+      - "5101:5101"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  rate-tutor:
+    build:
+      context: ./composite/rate_tutor
+      dockerfile: Dockerfile
+    container_name: rate-tutor-service
+    ports:
+      - "5102:5102"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+networks:
+  tuition-network:
+    driver: bridge

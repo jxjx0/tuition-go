@@ -1,0 +1,85 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  # Atomic Services
+  - name: student-service
+    url: http://student:5001
+    routes:
+      - name: student-route
+        paths:
+          - /api/v1/students
+        strip_path: true
+
+  - name: tutor-service
+    url: http://tutor:5002
+    routes:
+      - name: tutor-route
+        paths:
+          - /api/v1/tutors
+        strip_path: true
+
+  - name: session-service
+    url: http://session:5003
+    routes:
+      - name: session-route
+        paths:
+          - /api/v1/sessions
+        strip_path: true
+
+  - name: meeting-service
+    url: http://meeting:5004
+    routes:
+      - name: meeting-route
+        paths:
+          - /api/v1/meetings
+        strip_path: true
+
+  - name: calendar-service
+    url: http://calendar:5005
+    routes:
+      - name: calendar-route
+        paths:
+          - /api/v1/calendar
+        strip_path: true
+
+  - name: email-service
+    url: http://email:5006
+    routes:
+      - name: email-route
+        paths:
+          - /api/v1/emails
+        strip_path: true
+
+  - name: payment-service
+    url: http://payment:5007
+    routes:
+      - name: payment-route
+        paths:
+          - /api/v1/payments
+        strip_path: true
+
+  # Composite Services
+  - name: book-session-service
+    url: http://book-session:5100
+    routes:
+      - name: book-session-route
+        paths:
+          - /api/v1/book-session
+        strip_path: true
+
+  - name: cancel-session-service
+    url: http://cancel-session:5101
+    routes:
+      - name: cancel-session-route
+        paths:
+          - /api/v1/cancel-session
+        strip_path: true
+
+  - name: rate-tutor-service
+    url: http://rate-tutor:5102
+    routes:
+      - name: rate-tutor-route
+        paths:
+          - /api/v1/rate-tutor
+        strip_path: true
