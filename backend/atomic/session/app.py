@@ -42,11 +42,6 @@ session_model = api.model('Session', {
     'updatedAt': fields.DateTime(description='The last update timestamp')
 })
 
-@api.route("/health")
-class Health(Resource):
-    def get(self):
-        return {"status": "healthy", "service": "session"}, 200
-
 session_input_model = api.model('SessionInput', {
     'tutorId': fields.String(required=True, description='The tutor UUID', example='a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
     'studentId': fields.String(required=True, description='The student UUID', example='b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'),
@@ -58,6 +53,24 @@ session_input_model = api.model('SessionInput', {
     'durationHours': fields.Float(description='The duration of the session in hours', example=1),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
 })
+
+session_update_model = api.model('SessionUpdate', {
+    'subject': fields.String(description='The session subject', example='Math'),
+    'academicLevel': fields.String(description='The academic level', example='High School'),
+    'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
+    'endTime': fields.DateTime(description='The session end time', example='2028-03-03T11:00:00.000Z'),
+    'status': fields.String(description='The session status', example='confirmed'),
+    'durationHours': fields.Float(description='The duration of the session in hours', example=1.5),
+    'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
+})
+
+
+
+@api.route("/health")
+class Health(Resource):
+    def get(self):
+        return {"status": "healthy", "service": "session"}, 200
+
 
 @api.route('/session')
 class CreateSession(Resource):
@@ -91,15 +104,6 @@ class CreateSession(Resource):
         except (APIError, IndexError) as e:
             return {'message': 'Failed to create session', 'error': str(e)}, 500
 
-session_update_model = api.model('SessionUpdate', {
-    'subject': fields.String(description='The session subject', example='Math'),
-    'academicLevel': fields.String(description='The academic level', example='High School'),
-    'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
-    'endTime': fields.DateTime(description='The session end time', example='2028-03-03T11:00:00.000Z'),
-    'status': fields.String(description='The session status', example='confirmed'),
-    'durationHours': fields.Float(description='The duration of the session in hours', example=1.5),
-    'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
-})
 
 @api.route('/session/<string:sessionId>')
 class SessionResource(Resource):
