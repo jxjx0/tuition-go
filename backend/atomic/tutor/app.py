@@ -25,7 +25,8 @@ api = Api(app, doc="/docs",
     version="1.0",
     description="Tutor atomic service"
 )
-#testing purposes
+
+
 #GET all tutors
 @api.route("/tutors")
 class Tutors(Resource):
@@ -33,7 +34,8 @@ class Tutors(Resource):
         tutors = supabase.table("Tutor") .select("*").order("createdAt", desc=True).execute()
 
         return tutors.data, 200
-    
+
+
 #GET particular tutor with id
 @api.route("/tutor/<string:tutorID>")
 class GetTutorById(Resource):
@@ -51,6 +53,7 @@ class GetTutorById(Resource):
 
         except Exception as e:
             return {"error": str(e)}, 500
+
 
 #POST register/create tutor
 @api.route("/tutor/register")
@@ -112,6 +115,7 @@ class TutorRegister(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
+
 #PUT update tutor info
 @api.route("/tutor/<string:tutorID>")
 class UpdateTutor(Resource):
@@ -149,6 +153,7 @@ class UpdateTutor(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
+
 #DELETE delete tutor user
 @api.route("/tutor/<string:tutorID>")
 class DeleteTutor(Resource):
@@ -165,6 +170,7 @@ class DeleteTutor(Resource):
 
         except Exception as e:
             return {"error": str(e)}, 500
+
 
 #POST upload image for tutor profile
 #Accept file from frontend (multipart/form-data)
@@ -200,6 +206,7 @@ class UploadTutorImage(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
         
+
 #PUT update reviews portion of tutor
 # get the new review from the student & calculate what is the new no. of review and average rating 
 @api.route("/tutor/updateRating")
@@ -253,6 +260,7 @@ class UpdateTutorRating(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
+
 #POST create new subject that the tutor teaches
 @api.route("/tutor/<string:tutorId>/subjects")
 class TutorAddSubject(Resource):
@@ -287,6 +295,7 @@ class TutorAddSubject(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
+
 #GET get subjects tutor is teaching
 @api.route("/tutor/<string:tutorId>/subjects")
 class TutorSubjects(Resource):
@@ -298,6 +307,7 @@ class TutorSubjects(Resource):
 
         except Exception as e:
             return {"error": str(e)}, 500
+
 
 #PUT update subject that the tutor teaches
 @api.route("/tutor/<string:tutorId>/subjects/<string:subjectId>")
@@ -329,6 +339,7 @@ class UpdateTutorSubject(Resource):
 
         except Exception as e:
             return {"error": str(e)}, 500
+
 
 #DELETE delete subject that the tutor taught
 @api.route("/tutor/<string:tutorId>/subjects/<string:subjectId>")
