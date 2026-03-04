@@ -165,6 +165,40 @@ class DeleteTutor(Resource):
 
         except Exception as e:
             return {"error": str(e)}, 500
+
+#POST upload image for tutor profile
+#Accept file from frontend (multipart/form-data)
+@api.route("/tutor/<string:tutorId>/uploadImage")
+class UploadTutorImage(Resource):
+    def post(self, tutorId):
+        if 'profileImage' not in request.files:
+            return {"error": "No image file provided"}, 400
+
+        file = request.files['profileImage']
+
+        if file.filename == "":
+            return {"error": "Empty filename"}, 400
+
+        try:
+            # Create unique file path
+            file_path = f"{tutorId}/{file.filename}"
+
+            # Upload to Supabase Storage
+            supabase.storage.from_("tuitiongo").upload(file_path,file.read(),{"content-type": file.content_type})
+
+            # Get public URL
+            public_url = supabase.storage.from_("tuitiongo").get_public_url(file_path)
+
+            # Update Tutor table
+            supabase.table("Tutor").update({"imageURL": public_url}).eq("tutorId", tutorId).execute()
+
+            return {
+                "message": "Image uploaded successfully",
+                "imageUrl": public_url
+            }, 200
+
+        except Exception as e:
+            return {"error": str(e)}, 500
         
 #PUT update reviews portion of tutor
 # get the new review from the student & calculate what is the new no. of review and average rating 
