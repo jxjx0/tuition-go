@@ -59,7 +59,8 @@ class SearchTutors(Resource):
                     email,
                     phone,
                     averageRating,
-                    totalReviews
+                    totalReviews,
+                    bio
                 )
                 """
             )
@@ -168,7 +169,7 @@ class UpdateTutor(Resource):
             return {"error": "No input data provided"}, 400
 
         # Only allow specific fields to be updated by the user
-        allowed_fields = ["name", "phone", "password"]
+        allowed_fields = ["name", "phone", "password", "bio"]
 
         update_data = {}
 

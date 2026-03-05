@@ -12,6 +12,7 @@ import { TutorDashboardPage } from './pages/tutor-dashboard'
 import { BookSessionPage } from './pages/book-session'
 import { SessionDetailPage } from './pages/session-detail'
 import { ReviewPage } from './pages/review'
+import {TutorEditProfilePage} from './pages/tutor-profile-edit'
 
 const { createApp, defineComponent } = Vue
 
@@ -26,6 +27,7 @@ const routes = [
   { path: '/book/:sessionId', name: 'book-session', component: BookSessionPage, props: true },
   { path: '/session/:id', name: 'session-detail', component: SessionDetailPage, props: true },
   { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
+  { path: '/tutor-profile/', name: 'TutorProfile', component: TutorEditProfilePage },
 ]
 
 const App = defineComponent({
