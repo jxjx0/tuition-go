@@ -81,11 +81,11 @@ class SearchTutors(Resource):
 
             # Sorting
 
-            if sort == "highestRated":
-                query = query.order("Tutor.averageRating", desc=True)
+            # if sort == "highestRated":
+            #     query = query.order("Tutor.averageRating", desc=True)
 
-            elif sort == "mostReviews":
-                query = query.order("Tutor.totalReviews", desc=True)
+            # elif sort == "mostReviews":
+            #     query = query.order("totalReviews", desc=True)
 
             response = query.execute()
 
@@ -114,8 +114,18 @@ class SearchTutors(Resource):
                     "academicLevel": record["academicLevel"],
                     "hourlyRate": record["hourlyRate"]
                 })
+            
+            tutor_list = list(tutors.values())
 
-            return list(tutors.values()), 200
+            # Sorting tutors
+            if sort == "highestRated":
+                tutor_list = sorted(tutor_list, key=lambda x: x["averageRating"] or 0, reverse=True)
+
+            elif sort == "mostReviews":
+                tutor_list = sorted(tutor_list, key=lambda x: x["totalReviews"] or 0, reverse=True)
+
+
+            return tutor_list, 200
 
         except Exception as e:
             return {"error": str(e)}, 500

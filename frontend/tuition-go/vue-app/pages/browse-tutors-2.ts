@@ -3,10 +3,9 @@ import { defineComponent, ref, computed, onMounted, watch  } from 'vue'
 import { useTutors } from "../composables/useTutors"
 import { RouterLink } from 'vue-router'
 import { StarRating } from '../components'
-import { mockTutors } from '../composables/useMockData'
 
 export const BrowseTutorsPage2 = defineComponent({
-  name: 'BrowseTutorsPage',
+  name: 'BrowseTutorsPage2',
   components: { RouterLink, StarRating },
   setup() {
     const { tutors, searchTutors, loading } = useTutors()
@@ -14,21 +13,63 @@ export const BrowseTutorsPage2 = defineComponent({
       searchTutors({
         name: searchQuery.value,
         subject: subjectFilter.value,
-        level: levelFilter.value,
+        academicLevel: levelFilter.value,
         sort: sortBy.value,
       });
     });
+    
     const searchQuery = ref('')
     const subjectFilter = ref('')
     const levelFilter = ref('')
-    const sortBy = ref('rating')
+    const sortBy = ref('')
     // const allSubjects = computed(() => { const s = new Set<string>(); tutors.value.forEach(t => t.subjects.forEach(su => s.add(su.name))); return Array.from(s).sort() })
     // const allLevels = computed(() => { const l = new Set<string>(); tutors.value.forEach(t => t.subjects.forEach(su => l.add(su.level))); return Array.from(l).sort() })
-    const allSubjects = ref('rating')
-    const allLevels = ref('rating')
+    const allSubjects = [
+      "Mathematics",
+      "Additional Mathematics",
+      "English",
+      "Science",
+      "Chinese",
+      "Malay",
+      "Tamil",
+      "Physics",
+      "Chemistry",
+      "Biology",
+      "Economics",
+      "Geography",
+      "History",
+      "Literature",
+      "General Paper",
+      "Computer Science"
+    ]
+    const allLevels = [
+      "Primary 1",
+      "Primary 2",
+      "Primary 3",
+      "Primary 4",
+      "Primary 5",
+      "Primary 6",
+      "Secondary 1",
+      "Secondary 2",
+      "Secondary 3",
+      "Secondary 4",
+      "JC",
+      "IB"
+    ]
     const filteredTutors = computed(() => tutors.value)
     function clearFilters() { searchQuery.value = ''; subjectFilter.value = ''; levelFilter.value = '' }
+
+    watch([searchQuery, subjectFilter, levelFilter, sortBy], () => {
+      searchTutors({
+        name: searchQuery.value,
+        subject: subjectFilter.value,
+        academicLevel: levelFilter.value,
+        sort: sortBy.value
+      })
+    })
+
     return { searchQuery, subjectFilter, levelFilter, sortBy, allSubjects, allLevels, filteredTutors, clearFilters }
+    
   },
   template: `
     <div class="py-8 md:py-12" style="background-color:#F5F7FA">
@@ -42,7 +83,7 @@ export const BrowseTutorsPage2 = defineComponent({
             </div>
             <select v-model="subjectFilter" class="px-4 py-3 rounded-xl text-sm border cursor-pointer" style="border-color:#E8F0FE;color:#1B3A5C;min-width:160px"><option value="">All Subjects</option><option v-for="s in allSubjects" :key="s" :value="s">{{ s }}</option></select>
             <select v-model="levelFilter" class="px-4 py-3 rounded-xl text-sm border cursor-pointer" style="border-color:#E8F0FE;color:#1B3A5C;min-width:140px"><option value="">All Levels</option><option v-for="l in allLevels" :key="l" :value="l">{{ l }}</option></select>
-            <select v-model="sortBy" class="px-4 py-3 rounded-xl text-sm border cursor-pointer" style="border-color:#E8F0FE;color:#1B3A5C;min-width:160px"><option value="rating">Highest Rated</option><option value="price-low">Price: Low to High</option><option value="price-high">Price: High to Low</option><option value="reviews">Most Reviews</option></select>
+            <select v-model="sortBy" class="px-4 py-3 rounded-xl text-sm border cursor-pointer" style="border-color:#E8F0FE;color:#1B3A5C;min-width:160px"><option value="">No Sorting</option><option value="highestRated">Highest Rated</option><option value="mostReviews">Most Reviews</option></select>
           </div>
           <div v-if="subjectFilter||levelFilter||searchQuery" class="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t" style="border-color:#E8F0FE">
             <span class="text-xs font-medium" style="color:#1B3A5C;opacity:0.6">Active filters:</span>
@@ -52,24 +93,24 @@ export const BrowseTutorsPage2 = defineComponent({
           </div>
         </div>
         <div v-if="filteredTutors.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <router-link v-for="tutor in filteredTutors" :key="tutor.id" :to="'/tutors/'+tutor.id" class="group rounded-2xl border bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg" style="border-color:#E8F0FE;text-decoration:none">
-            <div class="p-6">
+          <router-link v-for="tutor in filteredTutors" :key="tutor.tutorId" :to="'/tutors/'+tutor.tutorId" class="group rounded-2xl border bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg flex flex-col h-full">
+            <div class="p-6 flex-1">
               <div class="flex items-start gap-4">
                 <div class="relative flex-shrink-0">
-                  <img :src="tutor.avatar" :alt="tutor.name" class="w-16 h-16 rounded-xl object-cover" crossorigin="anonymous" style="background-color:#E8F0FE"/>
+                  <img :src="tutor.imageURL" :alt="tutor.name" class="w-16 h-16 rounded-xl object-cover" crossorigin="anonymous" style="background-color:#E8F0FE"/>
                   <div v-if="tutor.verified" class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style="background-color:#2EAA4F"><svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></div>
                 </div>
                 <div class="flex-1 min-w-0">
                   <h3 class="text-lg font-bold truncate" style="color:#1B3A5C">{{ tutor.name }}</h3>
-                  <div class="flex items-center gap-2 mt-1"><StarRating :modelValue="tutor.rating" size="sm"/><span class="text-sm font-semibold" style="color:#1B3A5C">{{ tutor.rating }}</span><span class="text-xs" style="color:#1B3A5C;opacity:0.5">({{ tutor.totalReviews }})</span></div>
+                  <div class="flex items-center gap-2 mt-1"><StarRating :modelValue="tutor.averageRating" size="sm"/><span class="text-sm font-semibold" style="color:#1B3A5C">{{ tutor.rating }}</span><span class="text-xs" style="color:#1B3A5C;opacity:0.5">({{ tutor.totalReviews }})</span></div>
                 </div>
             
               </div>
-              <div class="mt-4 flex flex-wrap gap-2"><span v-for="sub in tutor.subjects.slice(0,3)" :key="sub.name+sub.level" class="px-2.5 py-1 rounded-lg text-xs font-medium" style="background-color:#E8F0FE;color:#4A90D9">{{ sub.name }} ({{ sub.level }})</span><span v-if="tutor.subjects.length>3" class="px-2.5 py-1 rounded-lg text-xs font-medium" style="background-color:#F5F7FA;color:#1B3A5C;opacity:0.6">+{{ tutor.subjects.length-3 }} more</span></div>
+              <div class="mt-4 flex flex-wrap gap-2"><span v-for="sub in tutor.subjects.slice(0,3)" :key="sub.subject+sub.academicLevel" class="px-2.5 py-1 rounded-lg text-xs font-medium" style="background-color:#E8F0FE;color:#4A90D9">{{ sub.subject }} ({{ sub.academicLevel }})</span><span v-if="tutor.subjects.length>3" class="px-2.5 py-1 rounded-lg text-xs font-medium" style="background-color:#F5F7FA;color:#1B3A5C;opacity:0.6">+{{ tutor.subjects.length-3 }} more</span></div>
               <p class="mt-3 text-sm leading-relaxed" style="color:#1B3A5C;opacity:0.7;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ tutor.bio }}</p>
             </div>
             <div class="px-6 py-4 flex items-center justify-between border-t" style="border-color:#E8F0FE;background-color:#F5F7FA">
-              <span class="text-xs" style="color:#1B3A5C;opacity:0.6">{{ tutor.totalSessions }} sessions</span>
+              <span></span>
               <span class="text-xs font-semibold" style="color:#4A90D9">View Profile</span>
             </div>
           </router-link>
