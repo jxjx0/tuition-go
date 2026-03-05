@@ -35,6 +35,48 @@ class Tutors(Resource):
 
         return tutors.data, 200
 
+#GET tutors by subject and/or academic level
+# GET /tutors/search?subject=Math
+# GET /tutors/search?academicLevel=Secondary 4
+# GET http://127.0.0.1:5002/tutors/search?subject=English&academicLevel=Secondary+4
+@api.route("/tutors/search")
+class SearchTutors(Resource):
+    def get(self):
+
+        subject = request.args.get("subject")
+        academic_level = request.args.get("academicLevel")
+
+        try:
+            query = supabase.table("TutorSubjects").select(
+                """
+                tutorSubjectId,
+                subject,
+                academicLevel,
+                hourlyRate,
+                Tutor (
+                    tutorId,
+                    name,
+                    email,
+                    phone,
+                    averageRating,
+                    totalReviews
+                )
+                """
+            )
+
+            if subject:
+                query = query.eq("subject", subject)
+
+            if academic_level:
+                query = query.eq("academicLevel", academic_level)
+
+            response = query.execute()
+
+            return response.data, 200
+
+        except Exception as e:
+            return {"error": str(e)}, 500
+
 
 #GET particular tutor with id
 @api.route("/tutor/<string:tutorID>")
