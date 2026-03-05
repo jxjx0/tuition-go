@@ -35,16 +35,19 @@ class Tutors(Resource):
 
         return tutors.data, 200
 
-#GET tutors by subject and/or academic level
+#GET tutors by subject and/or academic level and/or sort and/or name
 # GET /tutors/search?subject=Math
 # GET /tutors/search?academicLevel=Secondary 4
-# GET http://127.0.0.1:5002/tutors/search?subject=English&academicLevel=Secondary+4
+# GET http://127.0.0.1:5002/tutors/search?subject=English&academicLevel=Secondary+4&sort=priceLowHigh
+# GET /tutors/search?name=vincent
 @api.route("/tutors/search")
 class SearchTutors(Resource):
     def get(self):
 
         subject = request.args.get("subject")
         academic_level = request.args.get("academicLevel")
+        name = request.args.get("name")
+        sort = request.args.get("sort")
 
         try:
             query = supabase.table("TutorSubjects").select(
@@ -65,15 +68,38 @@ class SearchTutors(Resource):
                 """
             )
 
+            # Filters
             if subject:
                 query = query.eq("subject", subject)
 
             if academic_level:
                 query = query.eq("academicLevel", academic_level)
 
+            # 🔎 Search by tutor name (case insensitive)
+            if name:
+                query = query.ilike("Tutor.name", f"%{name}%")
+
+            # Sorting
+            if sort == "priceLowHigh":
+                query = query.order("hourlyRate", desc=False)
+
+            elif sort == "priceHighLow":
+                query = query.order("hourlyRate", desc=True)
+
+            elif sort == "highestRated":
+                query = query.order("Tutor.averageRating", desc=True)
+
+            elif sort == "mostReviews":
+                query = query.order("Tutor.totalReviews", desc=True)
+
             response = query.execute()
 
-            return response.data, 200
+            #Remove rows where Tutor is null
+            filtered_results = [
+                record for record in response.data if record.get("Tutor") is not None
+            ]
+
+            return filtered_results, 200
 
         except Exception as e:
             return {"error": str(e)}, 500
