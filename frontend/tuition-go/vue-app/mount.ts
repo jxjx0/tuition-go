@@ -13,6 +13,7 @@ import { BookSessionPage } from './pages/book-session'
 import { SessionDetailPage } from './pages/session-detail'
 import { ReviewPage } from './pages/review'
 import {TutorEditProfilePage} from './pages/tutor-profile-edit'
+import { BrowseTutorsPage2 } from './pages/browse-tutors-2'
 
 const { createApp, defineComponent } = Vue
 
@@ -21,6 +22,7 @@ const routes = [
   { path: '/login', name: 'login', component: LoginPage },
   { path: '/signup', name: 'signup', component: SignUpPage },
   { path: '/tutors', name: 'tutors', component: BrowseTutorsPage },
+  { path: '/tutors2', name: 'tutors2', component: BrowseTutorsPage2 },
   { path: '/tutors/:id', name: 'tutor-detail', component: TutorDetailPage, props: true },
   { path: '/dashboard', name: 'dashboard', component: StudentDashboardPage },
   { path: '/tutor-dashboard', name: 'tutor-dashboard', component: TutorDashboardPage },

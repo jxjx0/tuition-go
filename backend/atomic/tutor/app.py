@@ -56,14 +56,15 @@ class SearchTutors(Resource):
                 subject,
                 academicLevel,
                 hourlyRate,
-                Tutor (
+                Tutor!inner (
                     tutorId,
                     name,
                     email,
                     phone,
                     averageRating,
                     totalReviews,
-                    bio
+                    bio,
+                    imageURL
                 )
                 """
             )
@@ -75,18 +76,12 @@ class SearchTutors(Resource):
             if academic_level:
                 query = query.eq("academicLevel", academic_level)
 
-            # 🔎 Search by tutor name (case insensitive)
             if name:
                 query = query.ilike("Tutor.name", f"%{name}%")
 
             # Sorting
-            if sort == "priceLowHigh":
-                query = query.order("hourlyRate", desc=False)
 
-            elif sort == "priceHighLow":
-                query = query.order("hourlyRate", desc=True)
-
-            elif sort == "highestRated":
+            if sort == "highestRated":
                 query = query.order("Tutor.averageRating", desc=True)
 
             elif sort == "mostReviews":
@@ -94,16 +89,101 @@ class SearchTutors(Resource):
 
             response = query.execute()
 
-            #Remove rows where Tutor is null
-            filtered_results = [
-                record for record in response.data if record.get("Tutor") is not None
-            ]
+            tutors = {}
 
-            return filtered_results, 200
+            for record in response.data:
+                tutor = record["Tutor"]
+                tutor_id = tutor["tutorId"]
+
+                if tutor_id not in tutors:
+                    tutors[tutor_id] = {
+                        "tutorId": tutor["tutorId"],
+                        "name": tutor["name"],
+                        "email": tutor["email"],
+                        "phone": tutor["phone"],
+                        "bio": tutor["bio"],
+                        "imageURL": tutor["imageURL"],
+                        "averageRating": tutor["averageRating"],
+                        "totalReviews": tutor["totalReviews"],
+                        "subjects": []
+                    }
+
+                tutors[tutor_id]["subjects"].append({
+                    "tutorSubjectId": record["tutorSubjectId"],
+                    "subject": record["subject"],
+                    "academicLevel": record["academicLevel"],
+                    "hourlyRate": record["hourlyRate"]
+                })
+
+            return list(tutors.values()), 200
 
         except Exception as e:
             return {"error": str(e)}, 500
 
+#GET subjects taught by tutor with filter subject and/or academic level and/or sort and/or tutor name (includes price sorting)
+# @api.route("/tutors/search/subjects")
+# class SearchTutors(Resource):
+#     def get(self):
+
+#         subject = request.args.get("subject")
+#         academic_level = request.args.get("academicLevel")
+#         name = request.args.get("name")
+#         sort = request.args.get("sort")
+
+#         try:
+#             query = supabase.table("TutorSubjects").select(
+#                 """
+#                 tutorSubjectId,
+#                 subject,
+#                 academicLevel,
+#                 hourlyRate,
+#                 Tutor (
+#                     tutorId,
+#                     name,
+#                     email,
+#                     phone,
+#                     averageRating,
+#                     totalReviews,
+#                     bio
+#                 )
+#                 """
+#             )
+
+#             # Filters
+#             if subject:
+#                 query = query.eq("subject", subject)
+
+#             if academic_level:
+#                 query = query.eq("academicLevel", academic_level)
+
+#             # Search by tutor name
+#             if name:
+#                 query = query.ilike("Tutor.name", f"%{name}%")
+
+#             # Sorting
+#             if sort == "priceLowHigh":
+#                 query = query.order("hourlyRate", desc=False)
+
+#             elif sort == "priceHighLow":
+#                 query = query.order("hourlyRate", desc=True)
+
+#             elif sort == "highestRated":
+#                 query = query.order("Tutor.averageRating", desc=True)
+
+#             elif sort == "mostReviews":
+#                 query = query.order("Tutor.totalReviews", desc=True)
+
+#             response = query.execute()
+
+#             # ✅ Remove rows where Tutor is null
+#             filtered_results = [
+#                 record for record in response.data if record.get("Tutor") is not None
+#             ]
+
+#             return filtered_results, 200
+
+#         except Exception as e:
+#             return {"error": str(e)}, 500
 
 #GET particular tutor with id
 @api.route("/tutor/<string:tutorID>")
