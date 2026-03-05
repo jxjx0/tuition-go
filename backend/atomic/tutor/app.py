@@ -1,5 +1,5 @@
 import re
-
+from datetime import datetime, timezone
 from flask import Flask, jsonify, request
 from flask_restx import Api, Resource
 from flask_cors import CORS
@@ -160,38 +160,73 @@ class TutorRegister(Resource):
 
 
 #PUT update tutor info
+#Accept file from frontend (multipart/form-data)
 @api.route("/tutor/<string:tutorID>")
 class UpdateTutor(Resource):
     def put(self, tutorID):
-        data = request.get_json()
 
-        if not data:
-            return {"error": "No input data provided"}, 400
-
-        # Only allow specific fields to be updated by the user
-        allowed_fields = ["name", "phone", "password", "bio"]
+        form = request.form
+        file = request.files.get("profileImage")
 
         update_data = {}
 
-        for field in allowed_fields:
-            if field in data:
-                if field == "password":
-                    update_data["passwordHash"] = generate_password_hash(data["password"])
-                else:
-                    update_data[field] = data[field]
-
-        if not update_data:
-            return {"error": "No valid fields to update"}, 400
-
         try:
+            # Text fields
+            name = form.get("name")
+            phone = form.get("phone")
+            password = form.get("password")
+            bio = form.get("bio")
+
+            if name:
+                update_data["name"] = name
+
+            if phone:
+                update_data["phone"] = phone
+
+            if bio:
+                update_data["bio"] = bio
+
+            if password:
+                update_data["passwordHash"] = generate_password_hash(password)
+
+            # Image upload
+            if file and file.filename != "":
+                import uuid
+
+                # Create unique file path
+                file_ext = file.filename.split(".")[-1]
+                file_path = f"{tutorID}/{uuid.uuid4()}.{file_ext}"
+
+                # Upload to Supabase Storage
+                supabase.storage.from_("tuitiongo").upload(
+                    file_path,
+                    file.read(),
+                    {"content-type": file.content_type}
+                )
+
+                # Get public URL
+                public_url = supabase.storage.from_("tuitiongo").get_public_url(file_path)
+
+                update_data["imageURL"] = public_url
+
+            if not update_data:
+                return {"error": "No valid fields to update"}, 400
+            
+            # Update timestamp (UTC)
+            update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
+
+            # Update Tutor table
             response = (
-                supabase.table("Tutor").update(update_data).eq("tutorId", tutorID).execute()
+                supabase.table("Tutor")
+                .update(update_data)
+                .eq("tutorId", tutorID)
+                .execute()
             )
 
-            if not response.data:
-                return {"error": "Tutor not found"}, 404
-
-            return response.data, 200
+            return {
+                "message": "Tutor updated successfully",
+                "data": response.data
+            }, 200
 
         except Exception as e:
             return {"error": str(e)}, 500
@@ -214,41 +249,6 @@ class DeleteTutor(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-
-#POST upload image for tutor profile
-#Accept file from frontend (multipart/form-data)
-@api.route("/tutor/<string:tutorId>/uploadImage")
-class UploadTutorImage(Resource):
-    def post(self, tutorId):
-        if 'profileImage' not in request.files:
-            return {"error": "No image file provided"}, 400
-
-        file = request.files['profileImage']
-
-        if file.filename == "":
-            return {"error": "Empty filename"}, 400
-
-        try:
-            # Create unique file path
-            file_path = f"{tutorId}/{file.filename}"
-
-            # Upload to Supabase Storage
-            supabase.storage.from_("tuitiongo").upload(file_path,file.read(),{"content-type": file.content_type})
-
-            # Get public URL
-            public_url = supabase.storage.from_("tuitiongo").get_public_url(file_path)
-
-            # Update Tutor table
-            supabase.table("Tutor").update({"imageURL": public_url}).eq("tutorId", tutorId).execute()
-
-            return {
-                "message": "Image uploaded successfully",
-                "imageUrl": public_url
-            }, 200
-
-        except Exception as e:
-            return {"error": str(e)}, 500
-        
 
 #PUT update reviews portion of tutor
 # get the new review from the student & calculate what is the new no. of review and average rating 
@@ -290,8 +290,11 @@ class UpdateTutorRating(Resource):
             # Optional: round to 1 decimal place
             new_average = round(new_average, 1)
 
+            # Update timestamp (UTC)
+            updated_time = datetime.now(timezone.utc).isoformat()
+
             # Update tutor record
-            update_response = (supabase.table("Tutor").update({"averageRating": new_average,"totalReviews": new_total}).eq("tutorId", tutor_id).execute())
+            update_response = (supabase.table("Tutor").update({"averageRating": new_average,"totalReviews": new_total, "updatedAt":updated_time}).eq("tutorId", tutor_id).execute())
 
             return {
                 "tutorId": tutor_id,
@@ -371,6 +374,9 @@ class UpdateTutorSubject(Resource):
 
         if not update_data:
             return {"error": "No valid fields to update"}, 400
+
+        # Update timestamp (UTC)
+        update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
 
         try:
             response = (supabase.table("TutorSubjects").update(update_data).eq("tutorSubjectId", subjectId).eq("tutorId", tutorId).execute())
