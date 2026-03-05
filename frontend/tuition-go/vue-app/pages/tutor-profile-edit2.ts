@@ -1,6 +1,8 @@
 // @ts-ignore
-import { defineComponent, ref, reactive, computed, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { defineComponent, ref, reactive, computed, watch, onMounted } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
+import { findTutorById } from "../composables/useTutors"
+import { tutorApi } from '../services/tutorApi'
 
 const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'Chinese', 'Malay', 'Tamil', 'History', 'Geography', 'Computer Science', 'Economics', 'Accounting', 'Literature', 'Art', 'Music']
 const LEVELS = ['Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6', 'Secondary 1', 'Secondary 2', 'Secondary 3', 'Secondary 4', 'JC/A-Level', 'IB', 'University']
@@ -10,30 +12,56 @@ const tabs = [
   { key: 'teaching', label: 'Teaching Details', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
 ]
 
-const mockTutor = {
-  id: 'tutor-001',
-  name: 'Alex Tan',
-  email: 'alex.tan@email.com',
-  phone: '+65 9123 4567',
-  password: '',
-  avatar: '/images/default-tutor-avatar.jpg',
-  bio: 'Experienced math and physics tutor with 5 years of teaching experience. I believe in making complex concepts simple and accessible for every student.',
-  teachingPairs: [
-    { subject: 'Mathematics', level: 'Secondary 3', hourlyRate: 50 },
-    { subject: 'Mathematics', level: 'JC/A-Level', hourlyRate: 65 },
-    { subject: 'Physics', level: 'Secondary 3', hourlyRate: 55 },
-  ] as { subject: string; level: string; hourlyRate: number }[],
-}
-
-export const TutorEditProfilePage = defineComponent({
+export const TutorEditProfilePage2 = defineComponent({
   name: 'TutorEditProfilePage',
   components: { RouterLink },
   setup() {
+
+    const route = useRoute()
+    const tutorId = computed(() => route.params.id as string)
+    const { tutor, searchForTutor, loading } = findTutorById()
+
+    onMounted(() => {
+        searchForTutor(tutorId.value)
+    });
+
     const form = reactive({
-      ...mockTutor,
-      teachingPairs: mockTutor.teachingPairs.map(p => ({ ...p })),
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      bio: "",
+      profileImage: null,
+      teachingPairs: [] as any[],
+      photo: null as File | null
     })
-    const avatarPreview = ref(mockTutor.avatar)
+
+    const avatarPreview = ref("")
+
+    const originalData = ref("")
+
+    watch(tutor, (t) => {
+      if (!t) return;
+
+      form.name = t.name;
+      form.email = t.email;
+      form.phone = t.phone?.toString() || "";
+      form.bio = t.bio || "";
+
+      avatarPreview.value = t.imageURL;
+
+      form.teachingPairs = (t.subjects || []).map((s: any) => ({
+        subject: s.subject,
+        level: s.academicLevel,
+        hourlyRate: s.hourlyRate,
+        tutorSubjectId: s.tutorSubjectId,
+      }));
+      
+      //to check for isDirty
+      originalData.value = JSON.stringify(normalizeForm())
+
+    });
+
     const activeTab = ref<string>('personal')
     const newSubject = ref('')
     const newLevel = ref('')
@@ -44,8 +72,23 @@ export const TutorEditProfilePage = defineComponent({
     const showPassword = ref(false)
     const errors = reactive<Record<string, string>>({})
 
-    const originalJSON = JSON.stringify(mockTutor)
-    const isDirty = computed(() => JSON.stringify(form) !== originalJSON || avatarPreview.value !== mockTutor.avatar)
+    function normalizeForm() {
+      return {
+        name: form.name,
+        phone: form.phone,
+        bio: form.bio,
+        teachingPairs: form.teachingPairs.map((p) => ({
+          subject: p.subject,
+          level: p.level,
+          hourlyRate: p.hourlyRate,
+        })),
+        photoChanged: !!form.photo,
+      };
+    }
+
+    const isDirty = computed(() => {
+      return JSON.stringify(normalizeForm()) !== originalData.value;
+    });
 
     const passwordStrength = computed(() => {
       const pw = form.password
@@ -76,12 +119,25 @@ export const TutorEditProfilePage = defineComponent({
       return Object.keys(errors).length === 0
     }
 
-    function onAvatarChange(e: Event) {
-      const input = e.target as HTMLInputElement
+    // function onAvatarChange(e: Event) {
+    //   const input = e.target as HTMLInputElement
+    //   if (input.files && input.files[0]) {
+    //     const reader = new FileReader()
+    //     reader.onload = (ev) => { avatarPreview.value = ev.target?.result as string }
+    //     reader.readAsDataURL(input.files[0])
+    //   }
+    // }
+
+    function handleFileUpload(event:any) {
+      const file = event.target.files[0]
+      form.profileImage = file
+      const input = event.target as HTMLInputElement
       if (input.files && input.files[0]) {
         const reader = new FileReader()
         reader.onload = (ev) => { avatarPreview.value = ev.target?.result as string }
         reader.readAsDataURL(input.files[0])
+        //include photo as part of form
+        form.photo = event.target.files[0]
       }
     }
 
@@ -113,14 +169,46 @@ export const TutorEditProfilePage = defineComponent({
     }
 
     async function saveProfile() {
-      if (!validate()) return
-      saving.value = true
-      await new Promise((r) => setTimeout(r, 1200))
-      saving.value = false
-      saved.value = true
-      setTimeout(() => { saved.value = false }, 3000)
-    }
 
+      saving.value = true
+
+      try {
+
+        const formData = new FormData()
+
+        formData.append("name", form.name)
+        formData.append("phone", form.phone)
+        formData.append("bio", form.bio)
+
+        if (form.password) {
+          formData.append("password", form.password)
+        }
+
+        if (form.profileImage) {
+          formData.append("profileImage", form.profileImage)
+        }
+
+        await tutorApi.put(
+          `/tutor/${tutorId.value}`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data"
+            }
+          }
+        )
+
+        alert("Profile updated successfully")
+
+        originalData.value = JSON.stringify(normalizeForm())
+        form.photo = null
+
+      } catch (err) {
+        console.error(err)
+      } finally {
+        saving.value = false
+      }
+    }
     watch(activeTab, () => { saved.value = false })
 
     return {
@@ -128,7 +216,7 @@ export const TutorEditProfilePage = defineComponent({
       isDirty, passwordStrength, tabs,
       SUBJECTS, LEVELS,
       newSubject, newLevel, newHourlyRate, pairError,
-      validate, onAvatarChange, addPair, removePair, saveProfile,
+      validate, handleFileUpload, addPair, removePair, saveProfile,
     }
   },
   template: `
@@ -147,7 +235,7 @@ export const TutorEditProfilePage = defineComponent({
             <img :src="avatarPreview" alt="Profile photo" class="w-20 h-20 rounded-2xl object-cover shadow-lg" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <label class="absolute inset-0 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer" style="background-color:rgba(27,58,92,0.6);transition:opacity 0.2s">
               <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><circle cx="12" cy="13" r="3"/></svg>
-              <input type="file" accept="image/*" class="hidden" @change="onAvatarChange"/>
+              <input type="file" accept="image/*" class="hidden" @change="handleFileUpload"/>
             </label>
           </div>
           <div>
@@ -302,7 +390,7 @@ export const TutorEditProfilePage = defineComponent({
       <div class="px-6 md:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4" style="border-top:1px solid #E8F0FE;background-color:#FAFBFC">
         <div v-if="isDirty" class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full" style="background-color:#F5A623"></span>
-          <p class="text-xs font-medium" style="color:#1B3A5C;opacity:0.6">You have unsaved changes</p>
+          <p v-if="isDirty" class="text-xs font-medium" style="color:#1B3A5C;opacity:0.6">You have unsaved changes</p>
         </div>
         <div v-else></div>
         <div class="flex items-center gap-3">

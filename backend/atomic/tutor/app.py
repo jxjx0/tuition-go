@@ -200,9 +200,27 @@ class SearchTutors(Resource):
 class GetTutorById(Resource):
     def get(self, tutorID):
         try:
-            #ensures only 1 record
             response = (
-                supabase.table("Tutor").select("*").eq("tutorId", tutorID).single().execute()
+                supabase.table("Tutor")
+                .select("""
+                    tutorId,
+                    name,
+                    email,
+                    phone,
+                    bio,
+                    imageURL,
+                    averageRating,
+                    totalReviews,
+                    subjects:TutorSubjects(
+                        tutorSubjectId,
+                        subject,
+                        academicLevel,
+                        hourlyRate
+                    )
+                """)
+                .eq("tutorId", tutorID)
+                .single()
+                .execute()
             )
 
             if not response.data:
@@ -438,21 +456,64 @@ class TutorAddSubject(Resource):
         hourly_rate = data.get("hourlyRate")
 
         if not subject or not academic_level or hourly_rate is None:
-            return {"error": "subject, academicLevel and hourlyRate are required"}, 400
+            return {"error": "Subject, Academic Level and Hourly Rate are required"}, 400
 
         if hourly_rate <= 0:
-            return {"error": "hourlyRate must be positive"}, 400
-
-        subject_data = {
-            "tutorId": tutorId,
-            "subject": subject,
-            "academicLevel": academic_level,
-            "hourlyRate": hourly_rate
-        }
+            return {"error": "Hourly Rate must be positive"}, 400
 
         try:
-            response = supabase.table("TutorSubjects").insert(subject_data).execute()
-            return response.data, 201
+            #Check if subject + academic level already exists
+            existing = (
+                supabase.table("TutorSubjects")
+                .select("*")
+                .eq("tutorId", tutorId)
+                .eq("subject", subject)
+                .eq("academicLevel", academic_level)
+                .execute()
+            )
+
+            if existing.data:
+                existing_record = existing.data[0]
+
+                #Exact duplicate check
+                if existing_record["hourlyRate"] == hourly_rate:
+                    return {
+                        "error": "This subject with the same academic level and hourly rate already exists for this tutor."
+                    }, 409
+
+                #Same subject + level but different hourly rate → update
+                update_response = (
+                    supabase.table("TutorSubjects")
+                    .update({"hourlyRate": hourly_rate})
+                    .eq("tutorId", tutorId)
+                    .eq("subject", subject)
+                    .eq("academicLevel", academic_level)
+                    .execute()
+                )
+
+                return {
+                    "message": "Hourly rate updated successfully.",
+                    "data": update_response.data
+                }, 200
+
+            #No duplicate → insert new subject
+            subject_data = {
+                "tutorId": tutorId,
+                "subject": subject,
+                "academicLevel": academic_level,
+                "hourlyRate": hourly_rate
+            }
+
+            insert_response = (
+                supabase.table("TutorSubjects")
+                .insert(subject_data)
+                .execute()
+            )
+
+            return {
+                "message": "Subject added successfully",
+                "data": insert_response.data
+            }, 201
 
         except Exception as e:
             return {"error": str(e)}, 500
