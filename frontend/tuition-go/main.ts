@@ -1,4 +1,6 @@
+import './styles/globals.css'
 import { mountVueApp } from './vue-app/mount'
+
 
 const appElement = document.getElementById('app')
 if (appElement) {
