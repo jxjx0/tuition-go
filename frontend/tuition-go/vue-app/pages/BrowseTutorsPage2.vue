@@ -49,8 +49,8 @@ onMounted(() => {
   searchTutors({
     name: searchQuery.value,
     subject: subjectFilter.value,
-    academicLevel: levelFilter.value,
-    sort: sortBy.value,
+    level: levelFilter.value,
+    sort: sortBy.value
   });
 });
 
@@ -66,8 +66,8 @@ watch([searchQuery, subjectFilter, levelFilter, sortBy], () => {
   searchTutors({
     name: searchQuery.value,
     subject: subjectFilter.value,
-    academicLevel: levelFilter.value,
-    sort: sortBy.value
+    level: levelFilter.value,
+    sort: sortBy.value,
   })
 })
 </script>
@@ -129,17 +129,17 @@ watch([searchQuery, subjectFilter, levelFilter, sortBy], () => {
             <div class="flex items-start gap-4">
               <div class="relative flex-shrink-0">
                 <img :src="tutor.imageURL" :alt="tutor.name" class="w-16 h-16 rounded-xl object-cover" crossorigin="anonymous" style="background-color:#E8F0FE"/>
-                <div v-if="tutor.verified" class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style="background-color:#2EAA4F">
+                <!-- <div v-if="tutor.verified" class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style="background-color:#2EAA4F">
                   <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                   </svg>
-                </div>
+                </div> -->
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-lg font-bold truncate" style="color:#1B3A5C">{{ tutor.name }}</h3>
                 <div class="flex items-center gap-2 mt-1">
                   <StarRating :modelValue="tutor.averageRating" size="sm"/>
-                  <span class="text-sm font-semibold" style="color:#1B3A5C">{{ tutor.rating }}</span>
+                  <span class="text-sm font-semibold" style="color:#1B3A5C">{{ tutor.averageRating.toFixed(0) }}</span>
                   <span class="text-xs" style="color:#1B3A5C;opacity:0.5">({{ tutor.totalReviews }})</span>
                 </div>
               </div>
@@ -148,7 +148,7 @@ watch([searchQuery, subjectFilter, levelFilter, sortBy], () => {
               <span v-for="sub in tutor.subjects.slice(0,3)" :key="sub.subject+sub.academicLevel" class="px-2.5 py-1 rounded-lg text-xs font-medium" style="background-color:#E8F0FE;color:#4A90D9">{{ sub.subject }} ({{ sub.academicLevel }})</span>
               <span v-if="tutor.subjects.length>3" class="px-2.5 py-1 rounded-lg text-xs font-medium" style="background-color:#F5F7FA;color:#1B3A5C;opacity:0.6">+{{ tutor.subjects.length-3 }} more</span>
             </div>
-            <p class="mt-3 text-sm leading-relaxed" style="color:#1B3A5C;opacity:0.7;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{ tutor.bio }}</p>
+            <p class="mt-3 text-sm leading-relaxed" style="color:#1B3A5C;opacity:0.7;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden">{{ tutor.bio }}</p>
           </div>
           <div class="px-6 py-4 flex items-center justify-between border-t" style="border-color:#E8F0FE;background-color:#F5F7FA">
             <span></span>

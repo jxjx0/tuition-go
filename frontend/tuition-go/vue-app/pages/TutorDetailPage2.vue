@@ -34,18 +34,18 @@ onMounted(() => {
           <div class="flex flex-col md:flex-row items-start gap-6">
             <div class="relative flex-shrink-0">
               <img :src="tutor.imageURL" :alt="tutor.name" class="w-24 h-24 md:w-28 md:h-28 rounded-2xl object-cover border-4 border-white shadow-lg" crossorigin="anonymous" style="background-color:#E8F0FE"/>
-              <div v-if="tutor.verified" class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-sm" style="background-color:#2EAA4F">
-                <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <!-- <div class="absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center shadow-sm" style="background-color:#2EAA4F"> -->
+                <!-- <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
                 </svg>
-              </div>
+              </div> -->
             </div>
             <div class="flex-1">
               <h1 class="text-2xl md:text-3xl font-extrabold text-white">{{ tutor.name }}</h1>
               <div class="flex flex-wrap items-center gap-4 mt-3">
                 <div class="flex items-center gap-1">
                   <StarRating :modelValue="tutor.averageRating" size="sm"/>
-                  <span class="text-sm font-bold text-white ml-1">{{ tutor.averageRating }}</span>
+                  <span class="text-sm font-bold text-white ml-1">{{ tutor.averageRating.toFixed(0) }}</span>
                   <span class="text-sm" style="color:rgba(255,255,255,0.7)">({{ tutor.totalReviews }} reviews)</span>
                 </div>
               </div>
