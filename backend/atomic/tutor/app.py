@@ -1,5 +1,5 @@
 import re
-
+from datetime import datetime, timezone
 from flask import Flask, jsonify, request
 from flask_restx import Api, Resource
 from flask_cors import CORS
@@ -35,15 +35,192 @@ class Tutors(Resource):
 
         return tutors.data, 200
 
+#GET tutors by subject and/or academic level and/or sort and/or name
+# GET /tutors/search?subject=Math
+# GET /tutors/search?academicLevel=Secondary 4
+# GET http://127.0.0.1:5002/tutors/search?subject=English&academicLevel=Secondary+4&sort=priceLowHigh
+# GET /tutors/search?name=vincent
+@api.route("/tutors/search")
+class SearchTutors(Resource):
+    def get(self):
+
+        subject = request.args.get("subject")
+        academic_level = request.args.get("academicLevel")
+        name = request.args.get("name")
+        sort = request.args.get("sort")
+
+        try:
+            query = supabase.table("TutorSubjects").select(
+                """
+                tutorSubjectId,
+                subject,
+                academicLevel,
+                hourlyRate,
+                Tutor!inner (
+                    tutorId,
+                    name,
+                    email,
+                    phone,
+                    averageRating,
+                    totalReviews,
+                    bio,
+                    imageURL
+                )
+                """
+            )
+
+            # Filters
+            if subject:
+                query = query.eq("subject", subject)
+
+            if academic_level:
+                query = query.eq("academicLevel", academic_level)
+
+            if name:
+                query = query.ilike("Tutor.name", f"%{name}%")
+
+            # Sorting
+
+            # if sort == "highestRated":
+            #     query = query.order("Tutor.averageRating", desc=True)
+
+            # elif sort == "mostReviews":
+            #     query = query.order("totalReviews", desc=True)
+
+            response = query.execute()
+
+            tutors = {}
+
+            for record in response.data:
+                tutor = record["Tutor"]
+                tutor_id = tutor["tutorId"]
+
+                if tutor_id not in tutors:
+                    tutors[tutor_id] = {
+                        "tutorId": tutor["tutorId"],
+                        "name": tutor["name"],
+                        "email": tutor["email"],
+                        "phone": tutor["phone"],
+                        "bio": tutor["bio"],
+                        "imageURL": tutor["imageURL"],
+                        "averageRating": tutor["averageRating"],
+                        "totalReviews": tutor["totalReviews"],
+                        "subjects": []
+                    }
+
+                tutors[tutor_id]["subjects"].append({
+                    "tutorSubjectId": record["tutorSubjectId"],
+                    "subject": record["subject"],
+                    "academicLevel": record["academicLevel"],
+                    "hourlyRate": record["hourlyRate"]
+                })
+            
+            tutor_list = list(tutors.values())
+
+            # Sorting tutors
+            if sort == "highestRated":
+                tutor_list = sorted(tutor_list, key=lambda x: x["averageRating"] or 0, reverse=True)
+
+            elif sort == "mostReviews":
+                tutor_list = sorted(tutor_list, key=lambda x: x["totalReviews"] or 0, reverse=True)
+
+
+            return tutor_list, 200
+
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+#GET subjects taught by tutor with filter subject and/or academic level and/or sort and/or tutor name (includes price sorting)
+# @api.route("/tutors/search/subjects")
+# class SearchTutors(Resource):
+#     def get(self):
+
+#         subject = request.args.get("subject")
+#         academic_level = request.args.get("academicLevel")
+#         name = request.args.get("name")
+#         sort = request.args.get("sort")
+
+#         try:
+#             query = supabase.table("TutorSubjects").select(
+#                 """
+#                 tutorSubjectId,
+#                 subject,
+#                 academicLevel,
+#                 hourlyRate,
+#                 Tutor (
+#                     tutorId,
+#                     name,
+#                     email,
+#                     phone,
+#                     averageRating,
+#                     totalReviews,
+#                     bio
+#                 )
+#                 """
+#             )
+
+#             # Filters
+#             if subject:
+#                 query = query.eq("subject", subject)
+
+#             if academic_level:
+#                 query = query.eq("academicLevel", academic_level)
+
+#             # Search by tutor name
+#             if name:
+#                 query = query.ilike("Tutor.name", f"%{name}%")
+
+#             # Sorting
+#             if sort == "priceLowHigh":
+#                 query = query.order("hourlyRate", desc=False)
+
+#             elif sort == "priceHighLow":
+#                 query = query.order("hourlyRate", desc=True)
+
+#             elif sort == "highestRated":
+#                 query = query.order("Tutor.averageRating", desc=True)
+
+#             elif sort == "mostReviews":
+#                 query = query.order("Tutor.totalReviews", desc=True)
+
+#             response = query.execute()
+
+#             # ✅ Remove rows where Tutor is null
+#             filtered_results = [
+#                 record for record in response.data if record.get("Tutor") is not None
+#             ]
+
+#             return filtered_results, 200
+
+#         except Exception as e:
+#             return {"error": str(e)}, 500
 
 #GET particular tutor with id
 @api.route("/tutor/<string:tutorID>")
 class GetTutorById(Resource):
     def get(self, tutorID):
         try:
-            #ensures only 1 record
             response = (
-                supabase.table("Tutor").select("*").eq("tutorId", tutorID).single().execute()
+                supabase.table("Tutor")
+                .select("""
+                    tutorId,
+                    name,
+                    email,
+                    phone,
+                    bio,
+                    imageURL,
+                    averageRating,
+                    totalReviews,
+                    subjects:TutorSubjects(
+                        tutorSubjectId,
+                        subject,
+                        academicLevel,
+                        hourlyRate
+                    )
+                """)
+                .eq("tutorId", tutorID)
+                .single()
+                .execute()
             )
 
             if not response.data:
@@ -117,38 +294,73 @@ class TutorRegister(Resource):
 
 
 #PUT update tutor info
+#Accept file from frontend (multipart/form-data)
 @api.route("/tutor/<string:tutorID>")
 class UpdateTutor(Resource):
     def put(self, tutorID):
-        data = request.get_json()
 
-        if not data:
-            return {"error": "No input data provided"}, 400
-
-        # Only allow specific fields to be updated by the user
-        allowed_fields = ["name", "phone", "password"]
+        form = request.form
+        file = request.files.get("profileImage")
 
         update_data = {}
 
-        for field in allowed_fields:
-            if field in data:
-                if field == "password":
-                    update_data["passwordHash"] = generate_password_hash(data["password"])
-                else:
-                    update_data[field] = data[field]
-
-        if not update_data:
-            return {"error": "No valid fields to update"}, 400
-
         try:
+            # Text fields
+            name = form.get("name")
+            phone = form.get("phone")
+            password = form.get("password")
+            bio = form.get("bio")
+
+            if name:
+                update_data["name"] = name
+
+            if phone:
+                update_data["phone"] = phone
+
+            if bio:
+                update_data["bio"] = bio
+
+            if password:
+                update_data["passwordHash"] = generate_password_hash(password)
+
+            # Image upload
+            if file and file.filename != "":
+                import uuid
+
+                # Create unique file path
+                file_ext = file.filename.split(".")[-1]
+                file_path = f"{tutorID}/{uuid.uuid4()}.{file_ext}"
+
+                # Upload to Supabase Storage
+                supabase.storage.from_("tuitiongo").upload(
+                    file_path,
+                    file.read(),
+                    {"content-type": file.content_type}
+                )
+
+                # Get public URL
+                public_url = supabase.storage.from_("tuitiongo").get_public_url(file_path)
+
+                update_data["imageURL"] = public_url
+
+            if not update_data:
+                return {"error": "No valid fields to update"}, 400
+            
+            # Update timestamp (UTC)
+            update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
+
+            # Update Tutor table
             response = (
-                supabase.table("Tutor").update(update_data).eq("tutorId", tutorID).execute()
+                supabase.table("Tutor")
+                .update(update_data)
+                .eq("tutorId", tutorID)
+                .execute()
             )
 
-            if not response.data:
-                return {"error": "Tutor not found"}, 404
-
-            return response.data, 200
+            return {
+                "message": "Tutor updated successfully",
+                "data": response.data
+            }, 200
 
         except Exception as e:
             return {"error": str(e)}, 500
@@ -171,41 +383,6 @@ class DeleteTutor(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-
-#POST upload image for tutor profile
-#Accept file from frontend (multipart/form-data)
-@api.route("/tutor/<string:tutorId>/uploadImage")
-class UploadTutorImage(Resource):
-    def post(self, tutorId):
-        if 'profileImage' not in request.files:
-            return {"error": "No image file provided"}, 400
-
-        file = request.files['profileImage']
-
-        if file.filename == "":
-            return {"error": "Empty filename"}, 400
-
-        try:
-            # Create unique file path
-            file_path = f"{tutorId}/{file.filename}"
-
-            # Upload to Supabase Storage
-            supabase.storage.from_("tuitiongo").upload(file_path,file.read(),{"content-type": file.content_type})
-
-            # Get public URL
-            public_url = supabase.storage.from_("tuitiongo").get_public_url(file_path)
-
-            # Update Tutor table
-            supabase.table("Tutor").update({"imageURL": public_url}).eq("tutorId", tutorId).execute()
-
-            return {
-                "message": "Image uploaded successfully",
-                "imageUrl": public_url
-            }, 200
-
-        except Exception as e:
-            return {"error": str(e)}, 500
-        
 
 #PUT update reviews portion of tutor
 # get the new review from the student & calculate what is the new no. of review and average rating 
@@ -247,8 +424,11 @@ class UpdateTutorRating(Resource):
             # Optional: round to 1 decimal place
             new_average = round(new_average, 1)
 
+            # Update timestamp (UTC)
+            updated_time = datetime.now(timezone.utc).isoformat()
+
             # Update tutor record
-            update_response = (supabase.table("Tutor").update({"averageRating": new_average,"totalReviews": new_total}).eq("tutorId", tutor_id).execute())
+            update_response = (supabase.table("Tutor").update({"averageRating": new_average,"totalReviews": new_total, "updatedAt":updated_time}).eq("tutorId", tutor_id).execute())
 
             return {
                 "tutorId": tutor_id,
@@ -276,21 +456,64 @@ class TutorAddSubject(Resource):
         hourly_rate = data.get("hourlyRate")
 
         if not subject or not academic_level or hourly_rate is None:
-            return {"error": "subject, academicLevel and hourlyRate are required"}, 400
+            return {"error": "Subject, Academic Level and Hourly Rate are required"}, 400
 
         if hourly_rate <= 0:
-            return {"error": "hourlyRate must be positive"}, 400
-
-        subject_data = {
-            "tutorId": tutorId,
-            "subject": subject,
-            "academicLevel": academic_level,
-            "hourlyRate": hourly_rate
-        }
+            return {"error": "Hourly Rate must be positive"}, 400
 
         try:
-            response = supabase.table("TutorSubjects").insert(subject_data).execute()
-            return response.data, 201
+            #Check if subject + academic level already exists
+            existing = (
+                supabase.table("TutorSubjects")
+                .select("*")
+                .eq("tutorId", tutorId)
+                .eq("subject", subject)
+                .eq("academicLevel", academic_level)
+                .execute()
+            )
+
+            if existing.data:
+                existing_record = existing.data[0]
+
+                #Exact duplicate check
+                if existing_record["hourlyRate"] == hourly_rate:
+                    return {
+                        "error": "This subject with the same academic level and hourly rate already exists for this tutor."
+                    }, 409
+
+                #Same subject + level but different hourly rate → update
+                update_response = (
+                    supabase.table("TutorSubjects")
+                    .update({"hourlyRate": hourly_rate})
+                    .eq("tutorId", tutorId)
+                    .eq("subject", subject)
+                    .eq("academicLevel", academic_level)
+                    .execute()
+                )
+
+                return {
+                    "message": "Hourly rate updated successfully.",
+                    "data": update_response.data
+                }, 200
+
+            #No duplicate → insert new subject
+            subject_data = {
+                "tutorId": tutorId,
+                "subject": subject,
+                "academicLevel": academic_level,
+                "hourlyRate": hourly_rate
+            }
+
+            insert_response = (
+                supabase.table("TutorSubjects")
+                .insert(subject_data)
+                .execute()
+            )
+
+            return {
+                "message": "Subject added successfully",
+                "data": insert_response.data
+            }, 201
 
         except Exception as e:
             return {"error": str(e)}, 500
@@ -328,6 +551,9 @@ class UpdateTutorSubject(Resource):
 
         if not update_data:
             return {"error": "No valid fields to update"}, 400
+
+        # Update timestamp (UTC)
+        update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
 
         try:
             response = (supabase.table("TutorSubjects").update(update_data).eq("tutorSubjectId", subjectId).eq("tutorId", tutorId).execute())
