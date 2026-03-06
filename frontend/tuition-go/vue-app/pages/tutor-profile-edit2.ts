@@ -19,7 +19,7 @@ export const TutorEditProfilePage2 = defineComponent({
 
     const route = useRoute()
     const tutorId = computed(() => route.params.id as string)
-    const { tutor, searchForTutor, loading } = findTutorById()
+    const { tutor, searchForTutor,addSubject,deleteSubject, loading } = findTutorById()
 
     onMounted(() => {
         searchForTutor(tutorId.value)
@@ -77,11 +77,7 @@ export const TutorEditProfilePage2 = defineComponent({
         name: form.name,
         phone: form.phone,
         bio: form.bio,
-        teachingPairs: form.teachingPairs.map((p) => ({
-          subject: p.subject,
-          level: p.level,
-          hourlyRate: p.hourlyRate,
-        })),
+        password: form.password,
         photoChanged: !!form.photo,
       };
     }
@@ -141,7 +137,7 @@ export const TutorEditProfilePage2 = defineComponent({
       }
     }
 
-    function addPair() {
+    async function addPair() {
       pairError.value = ''
       if (!newSubject.value || !newLevel.value) {
         pairError.value = 'Please select both a subject and a level'
@@ -158,16 +154,40 @@ export const TutorEditProfilePage2 = defineComponent({
         pairError.value = 'This subject and level combination already exists'
         return
       }
-      form.teachingPairs.push({ subject: newSubject.value, level: newLevel.value, hourlyRate: newHourlyRate.value })
+      try {
+        const result = await addSubject(
+          tutorId.value,
+          newSubject.value,
+          newLevel.value,
+          newHourlyRate.value,
+        );
+        form.teachingPairs.push({ subject: newSubject.value, level: newLevel.value, hourlyRate: newHourlyRate.value })
+
+        // alert(result.message);
+      } catch (err: any) {
+        pairError.value =(err.response?.data?.error || "Failed to add subject");
+      }
       newSubject.value = ''
       newLevel.value = ''
       newHourlyRate.value = null
+
+      return
     }
 
-    function removePair(index: number) {
+    async function removePair(index: number) {
+
+      const subjectId = form.teachingPairs[index].tutorSubjectId
+
+      await deleteSubject(
+        tutorId.value,
+        subjectId
+      )
+
       form.teachingPairs.splice(index, 1)
+      return
     }
 
+    //send formdata in multiform format 
     async function saveProfile() {
 
       saving.value = true
@@ -216,7 +236,7 @@ export const TutorEditProfilePage2 = defineComponent({
       isDirty, passwordStrength, tabs,
       SUBJECTS, LEVELS,
       newSubject, newLevel, newHourlyRate, pairError,
-      validate, handleFileUpload, addPair, removePair, saveProfile,
+      validate, handleFileUpload, addPair, removePair, saveProfile, loading
     }
   },
   template: `
@@ -341,7 +361,7 @@ export const TutorEditProfilePage2 = defineComponent({
               <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold" style="color:#4A90D9">$</span>
               <input v-model.number="newHourlyRate" type="number" min="10" step="5" placeholder="Rate" class="w-full pl-9 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" style="border-color:#E8F0FE;color:#1B3A5C;background-color:#fff"/>
             </div>
-            <button @click="addPair" class="px-6 py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 shadow-sm" style="background-color:#4A90D9;white-space:nowrap">
+            <button :disabled="loading" @click="addPair" class="px-6 py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 shadow-sm" style="background-color:#4A90D9;white-space:nowrap">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
               Add
             </button>
@@ -387,7 +407,7 @@ export const TutorEditProfilePage2 = defineComponent({
 
       </div>
 
-      <div class="px-6 md:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4" style="border-top:1px solid #E8F0FE;background-color:#FAFBFC">
+      <div v-if="activeTab === 'personal'" class="px-6 md:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-4" style="border-top:1px solid #E8F0FE;background-color:#FAFBFC">
         <div v-if="isDirty" class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full" style="background-color:#F5A623"></span>
           <p v-if="isDirty" class="text-xs font-medium" style="color:#1B3A5C;opacity:0.6">You have unsaved changes</p>

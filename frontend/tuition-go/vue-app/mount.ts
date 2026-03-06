@@ -37,9 +37,9 @@ const routes = [
   { path: '/session/:id', name: 'session-detail', component: SessionDetailPage, props: true },
   { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
   //working path
-  { path: '/tutor-profile2/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
+  { path: '/tutor-profile/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
   //reference path
-  { path: '/tutor-profile/', name: 'TutorProfile', component: TutorEditProfilePage },
+  { path: '/tutor-profile2/', name: 'TutorProfile', component: TutorEditProfilePage },
 ]
 
 const App = defineComponent({

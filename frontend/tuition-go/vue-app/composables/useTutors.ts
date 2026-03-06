@@ -84,10 +84,52 @@ export function findTutorById() {
         }
     }
 
+    async function addSubject(
+        tutorId: string,
+        subject: string,
+        academicLevel: string,
+        hourlyRate: number,
+    ) {
+        try {
+        const response = await tutorApi.post(`/tutor/${tutorId}/subjects`, {
+            subject,
+            academicLevel,
+            hourlyRate,
+        });
+
+        return response.data;
+        } catch (err: any) {
+        error.value = err;
+        console.error(err);
+        throw err;
+        } finally {
+        loading.value = false;
+        }
+    }
+
+    async function deleteSubject(
+        tutorId: string,
+        subjectId: string
+    ) {
+        try {
+        const response = await tutorApi.delete(`/tutor/${tutorId}/subjects/${subjectId}`);
+
+        return response.data;
+        } catch (err: any) {
+        error.value = err;
+        console.error(err);
+        throw err;
+        } finally {
+        loading.value = false;
+        }
+    }
+
     return {
         tutor,
         loading,
         error,
-        searchForTutor
+        searchForTutor,
+        addSubject,
+        deleteSubject
     }
 }
