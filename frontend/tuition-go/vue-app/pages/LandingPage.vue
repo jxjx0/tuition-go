@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { SignInButton, SignUpButton } from '@clerk/vue'
+
 const heroTutors = [
   { name: 'James Tan', subject: 'A-Level Mathematics', rating: '4.9', rate: '65', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=James' },
   { name: 'Sarah Lim', subject: 'A-Level Chemistry', rating: '4.8', rate: '70', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Sarah' },
@@ -46,7 +48,9 @@ const testimonials = [
             <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight" style="text-wrap:balance">Find Your <span style="color:#2EAA4F">Perfect Tutor</span> in Singapore</h1>
             <p class="mt-6 text-lg md:text-xl leading-relaxed" style="color:rgba(255,255,255,0.85);text-wrap:balance">Connect with highly qualified, MOE-registered tutors for O-Level, A-Level, and IB subjects. Book sessions, learn via Google Meet, and excel in your exams.</p>
             <div class="mt-8 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-              <router-link to="/signup" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold text-white transition-all duration-200 hover:scale-105 shadow-lg" style="background-color:#2EAA4F">Start Learning Today</router-link>
+              <SignInButton mode="modal" fallback-redirect-url="/#/dashboard">
+                <button class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold text-white transition-all duration-200 hover:scale-105 shadow-lg" style="background-color:#2EAA4F">Start Learning Today</button>
+              </SignInButton>
               <router-link to="/tutors" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold transition-all duration-200 hover:scale-105" style="background-color:rgba(255,255,255,0.15);color:#fff;backdrop-filter:blur(8px)">Browse Tutors</router-link>
             </div>
             <div class="mt-10 flex flex-wrap items-center gap-6 justify-center lg:justify-start">
@@ -180,7 +184,9 @@ const testimonials = [
       <div class="max-w-3xl mx-auto px-4 text-center">
         <h2 class="text-3xl md:text-4xl font-extrabold text-white mb-6" style="text-wrap:balance">Ready to ace your exams?</h2>
         <p class="text-lg mb-8" style="color:rgba(255,255,255,0.85)">Join thousands of Singapore students already learning with EduMatch. Sign up now and get your first session at 20% off.</p>
-        <router-link to="/signup" class="inline-block px-10 py-4 rounded-xl text-lg font-bold transition-all duration-200 hover:scale-105 shadow-lg" style="background-color:#2EAA4F;color:#fff">Get Started for Free</router-link>
+        <SignInButton mode="modal" fallback-redirect-url="/#/dashboard">
+          <button class="inline-block px-10 py-4 rounded-xl text-lg font-bold transition-all duration-200 hover:scale-105 shadow-lg" style="background-color:#2EAA4F;color:#fff">Get Started for Free</button>
+        </SignInButton>
       </div>
     </section>
   </div>

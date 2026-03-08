@@ -1,13 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { SignUpButton } from '@clerk/vue'
 
-const router = useRouter()
 const selectedRole = ref<'student'|'tutor'>('student')
-
-function demoSignUp() { 
-  router.push(selectedRole.value === 'tutor' ? '/tutor-dashboard' : '/dashboard') 
-}
 </script>
 
 <template>
@@ -42,18 +37,15 @@ function demoSignUp() {
             </button>
           </div>
         </div>
-        <div class="rounded-xl p-6 mb-6 text-center" style="background-color:#F5F7FA;border:2px dashed #E8F0FE">
-          <div class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3" style="background-color:#E8F0FE">
-            <svg class="w-6 h-6" style="color:#2EAA4F" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
-            </svg>
-          </div>
-          <p class="text-sm font-semibold mb-1" style="color:#1B3A5C">Clerk Authentication</p>
-          <p class="text-xs" style="color:#1B3A5C;opacity:0.6">&lt;SignUp /&gt; component renders here</p>
-        </div>
-        <button @click="demoSignUp" class="w-full px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90" :style="{backgroundColor:selectedRole==='tutor'?'#2EAA4F':'#4A90D9'}">
-          Try Demo as {{ selectedRole==='tutor'?'Tutor':'Student' }}
-        </button>
+        <SignUpButton
+          mode="modal"
+          :unsafeMetadata="{ role: selectedRole }"
+          fallback-redirect-url="/#/dashboard"
+        >
+          <button class="w-full px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90" :style="{backgroundColor:selectedRole==='tutor'?'#2EAA4F':'#4A90D9'}">
+            Sign Up as {{ selectedRole==='tutor'?'Tutor':'Student' }}
+          </button>
+        </SignUpButton>
         <p class="text-center text-sm mt-6" style="color:#1B3A5C;opacity:0.6">
           Already have an account? <router-link to="/login" class="font-semibold hover:underline" style="color:#4A90D9">Log in</router-link>
         </p>

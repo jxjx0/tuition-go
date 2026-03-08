@@ -1,5 +1,6 @@
 import { createApp, defineComponent } from 'vue'
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { clerkPlugin } from '@clerk/vue'
 import { Navbar, Footer, StarRating } from './components'
 import App from './App.vue'
 import LandingPage from './pages/LandingPage.vue'
@@ -16,6 +17,7 @@ import SessionDetailPage from './pages/SessionDetailPage.vue'
 import ReviewPage from './pages/ReviewPage.vue'
 import TutorEditProfilePage from './pages/TutorEditProfilePage.vue'
 import TutorEditProfilePage2 from './pages/TutorEditProfilePage2.vue'
+import SSOCallbackPage from './pages/SSOCallbackPage.vue'
 
 const routes = [
   { path: '/', name: 'home', component: LandingPage },
@@ -32,6 +34,8 @@ const routes = [
   { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
   { path: '/tutor-profile/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
   { path: '/tutor-profile2/', name: 'TutorProfile', component: TutorEditProfilePage },
+  { path: '/sso-callback', name: 'sso-callback', component: SSOCallbackPage },
+
 ]
 
 export function mountVueApp(el: HTMLElement) {
@@ -42,6 +46,9 @@ export function mountVueApp(el: HTMLElement) {
   })
 
   const app = createApp(App)
+  app.use(clerkPlugin, {
+    publishableKey: import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string,
+  })
   app.use(router)
   app.mount(el)
   return app
