@@ -5,3 +5,6 @@
 __pycache__/
 *.pyc
 *.pyo
+
+#ignore python virtual env
+venv
