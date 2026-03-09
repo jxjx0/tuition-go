@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { SignUp } from '@clerk/vue'
 
 const selectedRole = ref<'student'|'tutor'>('student')
+const redirectUrl = computed(() =>
+  selectedRole.value === 'tutor' ? '/tutor-dashboard' : '/dashboard'
+)
 const showClerkSignUp = ref(false)
 const slideDirection = ref<'forward'|'back'>('forward')
 
@@ -69,7 +72,7 @@ function goBack() {
               Back
             </button>
             <div class="flex justify-center">
-              <SignUp :unsafeMetadata="{ role: selectedRole }" />
+              <SignUp :unsafeMetadata="{ role: selectedRole }" :forceRedirectUrl="redirectUrl" />
             </div>
           </div>
         </Transition>
