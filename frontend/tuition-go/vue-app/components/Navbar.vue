@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuth, useUser, useClerk, SignInButton } from '@clerk/vue'
+import { useAuth, useUser, useClerk } from '@clerk/vue'
 
 
 const route = useRoute()
@@ -64,9 +64,7 @@ async function handleLogout() {
         </div>
         <div class="hidden md:flex items-center gap-3">
           <template v-if="!isLoggedIn">
-            <SignInButton mode="modal" fallback-redirect-url="/#/dashboard">
-              <button class="px-4 py-2 text-sm font-medium rounded-lg" style="color:#4A90D9">Log In</button>
-            </SignInButton>
+            <router-link to="/login" class="px-4 py-2 text-sm font-medium rounded-lg" style="color:#4A90D9">Log In</router-link>
             <router-link to="/signup" class="px-5 py-2.5 text-sm font-semibold rounded-lg text-white shadow-sm" style="background-color:#4A90D9">Sign Up Free</router-link>
           </template>
           <template v-else>
@@ -102,9 +100,7 @@ async function handleLogout() {
         <router-link v-for="link in navLinks" :key="link.to" :to="link.to" @click="showMobile=false" class="block px-4 py-2.5 rounded-lg text-sm font-medium" :style="isActive(link.to)?'background-color:#E8F0FE;color:#4A90D9':'color:#1B3A5C'">{{ link.label }}</router-link>
         <template v-if="!isLoggedIn">
           <div class="pt-3 border-t flex flex-col gap-2" style="border-color:#E8F0FE">
-            <SignInButton mode="modal" fallback-redirect-url="/#/dashboard">
-              <button @click="showMobile=false" class="px-4 py-2.5 text-sm font-medium rounded-lg text-center w-full" style="color:#4A90D9">Log In</button>
-            </SignInButton>
+            <router-link to="/login" @click="showMobile=false" class="px-4 py-2.5 text-sm font-medium rounded-lg text-center w-full block" style="color:#4A90D9">Log In</router-link>
             <router-link to="/signup" @click="showMobile=false" class="px-4 py-2.5 text-sm font-semibold rounded-lg text-white text-center w-full block" style="background-color:#4A90D9">Sign Up Free</router-link>
           </div>
         </template>

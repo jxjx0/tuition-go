@@ -1,5 +1,5 @@
 import { createApp, defineComponent } from 'vue'
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { clerkPlugin } from '@clerk/vue'
 import { Navbar, Footer, StarRating } from './components'
 import App from './App.vue'
@@ -17,7 +17,7 @@ import SessionDetailPage from './pages/SessionDetailPage.vue'
 import ReviewPage from './pages/ReviewPage.vue'
 import TutorEditProfilePage from './pages/TutorEditProfilePage.vue'
 import TutorEditProfilePage2 from './pages/TutorEditProfilePage2.vue'
-import SSOCallbackPage from './pages/SSOCallbackPage.vue'
+import AuthRedirectPage from './pages/AuthRedirectPage.vue'
 
 const routes = [
   { path: '/', name: 'home', component: LandingPage },
@@ -34,13 +34,13 @@ const routes = [
   { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
   { path: '/tutor-profile/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
   { path: '/tutor-profile2/', name: 'TutorProfile', component: TutorEditProfilePage },
-  { path: '/sso-callback', name: 'sso-callback', component: SSOCallbackPage },
+  { path: '/auth-redirect', name: 'auth-redirect', component: AuthRedirectPage },
 
 ]
 
 export function mountVueApp(el: HTMLElement) {
   const router = createRouter({
-    history: createWebHashHistory(),
+    history: createWebHistory(),
     routes,
     scrollBehavior() { return { top: 0 } },
   })
