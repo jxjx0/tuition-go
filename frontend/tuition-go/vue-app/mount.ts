@@ -1,5 +1,5 @@
 import { createApp, defineComponent } from 'vue'
-import { createRouter, createWebHashHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { clerkPlugin } from '@clerk/vue'
 import { Navbar, Footer, StarRating } from './components'
 import App from './App.vue'
@@ -40,7 +40,7 @@ const routes = [
 
 export function mountVueApp(el: HTMLElement) {
   const router = createRouter({
-    history: createWebHashHistory(),
+    history: createWebHistory(),
     routes,
     scrollBehavior() { return { top: 0 } },
   })
