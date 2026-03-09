@@ -25,7 +25,7 @@ const redirectUrl = computed(() =>
 
       <!-- Clerk SignUp -->
       <div class="flex justify-center">
-        <SignUp :unsafeMetadata="{ role: selectedRole }" :forceRedirectUrl="redirectUrl" :signInFallbackRedirectUrl="redirectUrl" />
+        <SignUp :unsafeMetadata="{ role: selectedRole }" :forceRedirectUrl="redirectUrl" signInFallbackRedirectUrl="/auth-redirect" />
       </div>
     </div>
   </div>
