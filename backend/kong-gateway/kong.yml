@@ -83,3 +83,11 @@ services:
         paths:
           - /api/v1/rate-tutor
         strip_path: true
+
+  - name: get-student-sessions-service
+    url: http://get-student-sessions:5103
+    routes:
+      - name: get-student-sessions-route
+        paths:
+          - /api/v1/get-student-sessions
+        strip_path: true
