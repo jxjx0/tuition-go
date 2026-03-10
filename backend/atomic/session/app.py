@@ -36,7 +36,7 @@ session_model = api.model('Session', {
     'startTime': fields.DateTime(required=True, description='The session start time'),
     'endTime': fields.DateTime(required=True, description='The session end time'),
     'status': fields.String(description='The session status'),
-    'durationHours': fields.Float(description='The duration of the session in hours'),
+    'durationMins': fields.Float(description='The duration of the session in minutes'),
     'meetingLink': fields.String(description='The meeting link'),
     'createdAt': fields.DateTime(description='The creation timestamp'),
     'updatedAt': fields.DateTime(description='The last update timestamp')
@@ -50,7 +50,7 @@ session_input_model = api.model('SessionInput', {
     'startTime': fields.DateTime(required=True, description='The session start time', example='2027-03-03T10:00:00.000Z'),
     'endTime': fields.DateTime(required=True, description='The session end time', example='2028-03-03T11:00:00.000Z'),
     'status': fields.String(description='The session status', example='pending'),
-    'durationHours': fields.Float(description='The duration of the session in hours', example=1),
+    'durationMins': fields.Float(description='The duration of the session in minutes', example=60),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
 })
 
@@ -60,7 +60,7 @@ session_update_model = api.model('SessionUpdate', {
     'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
     'endTime': fields.DateTime(description='The session end time', example='2028-03-03T11:00:00.000Z'),
     'status': fields.String(description='The session status', example='confirmed'),
-    'durationHours': fields.Float(description='The duration of the session in hours', example=1.5),
+    'durationMins': fields.Float(description='The duration of the session in minutes', example=90),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
 })
 
@@ -75,9 +75,10 @@ class Health(Resource):
 @api.route('/session')
 class CreateSession(Resource):
     @api.expect(session_input_model)
-    @api.marshal_with(session_model, code=201)
+    @api.response(201, 'Session created successfully', session_model)
     @api.response(409, 'Tutor has an overlapping session at this time.')
     @api.response(400, 'Failed to create session')
+    @api.response(500, 'Internal server error')
     def post(self):
         """Create a new session record."""
         data = request.get_json()
@@ -101,7 +102,7 @@ class CreateSession(Resource):
             
             return {'message': 'Failed to create session, no data returned.'}, 400
 
-        except (APIError, IndexError) as e:
+        except Exception as e:
             return {'message': 'Failed to create session', 'error': str(e)}, 500
 
 
@@ -115,7 +116,7 @@ class SessionResource(Resource):
             if response.data:
                 return response.data[0], 200
             return {'message': 'Session not found'}, 404
-        except (APIError, IndexError) as e:
+        except Exception as e:
             return {'message': 'Failed to retrieve session', 'error': str(e)}, 500
 
     @api.expect(session_update_model)
@@ -128,7 +129,7 @@ class SessionResource(Resource):
             if response.data:
                 return response.data[0], 200
             return {'message': 'Session not found for update'}, 404
-        except (APIError, IndexError) as e:
+        except Exception as e:
             return {'message': 'Failed to update session', 'error': str(e)}, 500
 
     def delete(self, sessionId):
@@ -143,22 +144,31 @@ class SessionResource(Resource):
 
 @api.route('/sessions')
 class SessionList(Resource):
-    @api.doc(params={'tutorId': 'The ID of the tutor to filter by.'})
+    @api.doc(params={'tutorId': 'The ID of the tutor to filter by.', 'studentId': 'The ID of the student to filter by.'})
     @api.marshal_list_with(session_model)
     def get(self):
-        """Retrieve sessions, optionally filtered by tutorId."""
+        """Retrieve sessions, optionally filtered by tutorId and/or studentId."""
         tutor_id = request.args.get('tutorId')
+        student_id = request.args.get('studentId')
         query = supabase.table('Session').select('*')
+        
         if tutor_id:
             query = query.eq('tutorId', tutor_id)
+        if student_id:
+            query = query.eq('studentId', student_id)
         
         try:
             response = query.execute()
         except APIError as e:
             return {'message': 'An error occurred', 'error': str(e)}, 500
 
-        if not response.data and tutor_id:
-            return {'message': f'No sessions found for tutor {tutor_id}'}, 404
+        if not response.data and (tutor_id or student_id):
+            filters = []
+            if tutor_id:
+                filters.append(f'tutor {tutor_id}')
+            if student_id:
+                filters.append(f'student {student_id}')
+            return {'message': f'No sessions found for {" and ".join(filters)}'}, 404
         
         return response.data, 200
 
