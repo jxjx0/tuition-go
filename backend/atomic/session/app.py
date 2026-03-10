@@ -31,6 +31,7 @@ session_model = api.model('Session', {
     'sessionId': fields.String(description='The session UUID'),
     'tutorId': fields.String(required=True, description='The tutor UUID'),
     'studentId': fields.String(required=True, description='The student UUID'),
+    'tutorSubjectId': fields.String(description='The tutor subject UUID (references TutorSubjects table)'),
     'subject': fields.String(description='The session subject'),
     'academicLevel': fields.String(description='The academic level'),
     'startTime': fields.DateTime(required=True, description='The session start time'),
@@ -45,6 +46,7 @@ session_model = api.model('Session', {
 session_input_model = api.model('SessionInput', {
     'tutorId': fields.String(required=True, description='The tutor UUID', example='a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
     'studentId': fields.String(required=True, description='The student UUID', example='b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'),
+    'tutorSubjectId': fields.String(required=True, description='The tutor subject UUID (references TutorSubjects table)', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
     'subject': fields.String(description='The session subject', example='Math'),
     'academicLevel': fields.String(description='The academic level', example='High School'),
     'startTime': fields.DateTime(required=True, description='The session start time', example='2027-03-03T10:00:00.000Z'),
@@ -55,6 +57,7 @@ session_input_model = api.model('SessionInput', {
 })
 
 session_update_model = api.model('SessionUpdate', {
+    'tutorSubjectId': fields.String(description='The tutor subject UUID (references TutorSubjects table)', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
     'subject': fields.String(description='The session subject', example='Math'),
     'academicLevel': fields.String(description='The academic level', example='High School'),
     'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
