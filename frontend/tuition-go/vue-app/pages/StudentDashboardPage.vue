@@ -36,6 +36,13 @@ const fetchSessions = async () => {
   error.value = null
   try {
     const response = await fetch(`http://localhost:8000/api/v1/getsessions/student/${currentStudentId}/sessions`)
+    
+    // Handle 404 as "no sessions" instead of an error
+    if (response.status === 404) {
+      sessions.value = []
+      return
+    }
+    
     if (!response.ok) {
       throw new Error(`Failed to fetch sessions: ${response.statusText}`)
     }
@@ -128,6 +135,11 @@ const dashStats = computed(() => [
         <h2 class="text-xl font-bold mb-2" style="color:#ef4444">Error loading sessions</h2>
         <p class="mb-4" style="color:#1B3A5C;opacity:0.7">{{ error }}</p>
         <button @click="fetchSessions" class="px-6 py-2 rounded-xl text-sm font-semibold text-white" style="background-color:#4A90D9">Try Again</button>
+      </div>
+      <div v-else-if="sessions.length === 0" class="text-center py-20 rounded-2xl border p-8" style="background-color:#fff;border-color:#E8F0FE">
+        <h2 class="text-xl font-bold mb-2" style="color:#1B3A5C">No sessions yet</h2>
+        <p class="mb-4" style="color:#1B3A5C;opacity:0.7">Start your learning journey by booking a session with a tutor</p>
+        <router-link to="/tutors" class="inline-block px-6 py-2 rounded-xl text-sm font-semibold text-white" style="background-color:#4A90D9">Browse Tutors</router-link>
       </div>
       <div v-else>
         <div class="flex items-center gap-1 p-1 rounded-xl mb-6" style="background-color:#E8F0FE">
