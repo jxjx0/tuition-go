@@ -20,12 +20,8 @@ function fmtDate(d: string) {
   return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })
 }
 
-function fmtTime(isoString: string) {
-  // Extract time part (ignore timezone, times are already in Singapore time)
-  const timePart = isoString.split(' ')[1] || isoString.split('T')[1]
-  const [hours, minutes] = timePart.split(':')
-  const d = new Date(`2000-01-01T${hours}:${minutes}:00`)
-  return d.toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: true })
+function fmtTime(d: string) {
+  return new Date(d).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
 const activeTab = ref('upcoming')
