@@ -69,11 +69,34 @@ Returns all sessions for a specific student, enriched with tutor information.
 ]
 ```
 
-### 2. Get Tutor Sessions
 
-Basically get  tutor sessions by tutorid with the student info
+### 2. Get Session Detail
+**GET** `/session/{sessionId}`
 
-Still in progress, waiting for student atomic service to complete first
+Returns a single session with complete enriched information.
+
+**Response Example:**
+```json
+{
+    "sessionId": "a5c851b5-ac19-47ae-9baf-c7b95873d23c",
+    "tutorId": "1354994b-6589-421e-bb5f-8f0a59a1b29b",
+    "studentId": "5e97eb66-5fd9-4235-b9c7-788b770ef42a",
+    "tutorSubjectId": "d964fe8b-f4d6-4eb2-94f5-3d00bf0eda65",
+    "startTime": "2026-03-06T06:00:00+00:00",
+    "endTime": "2026-03-06T16:00:00",
+    "status": "completed",
+    "durationMins": 120.0,
+    "meetingLink": "https://meet.google.com/abc-defg-hij",
+    "createdAt": "2026-03-11T14:21:16.062391",
+    "updatedAt": "2026-03-11T14:21:16.062391",
+    "tutorName": "Dick Lee",
+    "tutorImageUrl": "https://mbywmrfzaurxucjnjnjb.supabase.co/storage/v1/object/public/tuitiongo/1354994b-6589-421e-bb5f-8f0a59a1b29b/174c49c2-7b64-43ed-801d-ec35cfff3e11.png",
+    "subjectName": "Science",
+    "academicLevel": "Secondary 1",
+    "totalPrice": 70.0
+}
+```
+
 
 ## API Gateway Integration
 
