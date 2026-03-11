@@ -47,7 +47,7 @@ const fetchSessions = async () => {
       tutorName: session.tutorName || 'Unknown Tutor',
       tutorAvatar: session.tutorImageUrl || 'https://via.placeholder.com/56',
       subject: session.subjectName || 'Unknown Subject',
-      level: '', // Level not provided from service
+      level: session.academicLevel || 'Unknown',
       date: session.startTime,
       startTime: fmtTime(session.startTime),
       endTime: fmtTime(session.endTime),
@@ -125,7 +125,7 @@ const dashStats = computed(() => [
             <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }}</h3>
+                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background-color:#E8F0FE;color:#4A90D9">Upcoming</span>
               </div>
               <p class="text-sm mt-1" style="color:#1B3A5C;opacity:0.7">with {{ session.tutorName }}</p>
@@ -153,7 +153,7 @@ const dashStats = computed(() => [
             <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }}</h3>
+                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background-color:rgba(46,170,79,0.1);color:#2EAA4F">Completed</span>
               </div>
               <p class="text-sm mt-1" style="color:#1B3A5C;opacity:0.7">with {{ session.tutorName }}</p>
@@ -173,7 +173,7 @@ const dashStats = computed(() => [
             <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0 grayscale" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }}</h3>
+                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background-color:rgba(239,68,68,0.1);color:#ef4444">Cancelled</span>
               </div>
               <p class="text-sm mt-1" style="color:#1B3A5C;opacity:0.7">with {{ session.tutorName }}</p>
