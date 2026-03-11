@@ -128,7 +128,7 @@ watch([searchQuery, subjectFilter, levelFilter, sortBy], () => {
           <div class="p-6 flex-1">
             <div class="flex items-start gap-4">
               <div class="relative flex-shrink-0">
-                <img :src="tutor.imageURL" :alt="tutor.name" class="w-16 h-16 rounded-xl object-cover" crossorigin="anonymous" style="background-color:#E8F0FE"/>
+                <img :src="tutor.imageURL || '/no_image.jpg'" :alt="tutor.name" class="w-16 h-16 rounded-xl object-cover" crossorigin="anonymous" style="background-color:#E8F0FE"/>
                 <!-- <div v-if="tutor.verified" class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full flex items-center justify-center" style="background-color:#2EAA4F">
                   <svg class="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
                     <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>

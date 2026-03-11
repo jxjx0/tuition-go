@@ -52,7 +52,7 @@ watch(tutor, (t) => {
   form.phone = t.phone?.toString() || "";
   form.bio = t.bio || "";
 
-  avatarPreview.value = t.imageURL;
+  avatarPreview.value = t.imageURL || '/no_image.jpg';
 
   form.teachingPairs = (t.subjects || []).map((s: any) => ({
     subject: s.subject,
