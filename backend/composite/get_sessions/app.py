@@ -127,6 +127,44 @@ class TutorSessions(Resource):
             return {'message': f'Internal server error: {str(e)}'}, 500
 
 
+@api.route("/session/<string:sessionId>")
+class SessionDetail(Resource):
+    @api.marshal_with(enhanced_session_model)
+    @api.response(200, 'Successfully retrieved session')
+    @api.response(404, 'Session not found')
+    @api.response(500, 'Internal server error')
+    def get(self, sessionId):
+        """Retrieve a specific session by ID with tutor details and pricing"""
+        try:
+            # 1. Get the specific session
+            session_response = requests.get(
+                f"{SESSION_SERVICE_URL}/session/{sessionId}",
+                timeout=5
+            )
+            
+            if session_response.status_code == 404:
+                return {'message': f'Session {sessionId} not found'}, 404
+            
+            if session_response.status_code != 200:
+                return {'message': 'Failed to retrieve session from session service'}, 500
+            
+            session = session_response.json()
+            
+            # 2. Enhance the session with tutor details and pricing
+            enhanced_sessions = _enrich_sessions([session])
+            
+            return enhanced_sessions[0], 200
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Request error: {str(e)}")
+            return {'message': f'Error communicating with services: {str(e)}'}, 500
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {'message': f'Internal server error: {str(e)}'}, 500
+
+
 def _enrich_sessions(sessions):
     """Helper function to enrich sessions with tutor details and pricing"""
     enhanced_sessions = []
