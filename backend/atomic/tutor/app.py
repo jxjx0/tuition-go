@@ -13,8 +13,9 @@ load_dotenv()
 # url=os.getenv("SUPABASE_URL")
 # key=os.getenv("SUPABASE_SECRET_KEY")
 
-url="https://mbywmrfzaurxucjnjnjb.supabase.co"
-key="sb_secret_BASQ0MdW1FzdOqKWLbzvDQ_F2e81yxf"
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+
 
 supabase: Client = create_client(url,key)
 
