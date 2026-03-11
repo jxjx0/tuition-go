@@ -1,18 +1,85 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { mockSessions } from '../composables/useMockData'
+import { ref, computed, onMounted } from 'vue'
+
+interface Session {
+  id: string
+  tutorName: string
+  tutorAvatar: string | null
+  subject: string
+  level: string
+  date: string
+  startTime: string
+  endTime: string
+  price: number
+  status: string
+  meetingLink: string | null
+  notes: string | null
+}
 
 function fmtDate(d: string) { 
-  return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' }) 
+  return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' })
+}
+
+function fmtTime(isoString: string) {
+  return new Date(isoString).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
 const activeTab = ref('upcoming')
-const studentId = 'stu1'
+const currentStudentId = '5e97eb66-5fd9-4235-b9c7-788b770ef42a'
 
-const studentSessions = computed(() => mockSessions.filter(s => s.studentId === studentId))
-const upcomingSessions = computed(() => studentSessions.value.filter(s => s.status === 'booked'))
-const pastSessions = computed(() => studentSessions.value.filter(s => s.status === 'completed'))
-const cancelledSessions = computed(() => studentSessions.value.filter(s => s.status === 'cancelled'))
+const sessions = ref<Session[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+const fetchSessions = async () => {
+  loading.value = true
+  error.value = null
+  try {
+    const response = await fetch(`http://localhost:8000/api/v1/getsessions/student/${currentStudentId}/sessions`)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch sessions: ${response.statusText}`)
+    }
+    const data = await response.json()
+    
+    // Transform the API response to match the component's expected format
+    sessions.value = data.map((session: any) => ({
+      id: session.sessionId,
+      tutorName: session.tutorName || 'Unknown Tutor',
+      tutorAvatar: session.tutorImageUrl || 'https://via.placeholder.com/56',
+      subject: session.subjectName || 'Unknown Subject',
+      level: '', // Level not provided from service
+      date: session.startTime,
+      startTime: fmtTime(session.startTime),
+      endTime: fmtTime(session.endTime),
+      price: session.totalPrice || 0,
+      status: session.status || 'pending',
+      meetingLink: session.meetingLink,
+      notes: null
+    }))
+  } catch (err: any) {
+    error.value = err.message
+    console.error('Error fetching sessions:', err)
+    sessions.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+const upcomingSessions = computed(() => {
+  return sessions.value.filter(s => s.status !== 'completed' && s.status !== 'cancelled')
+})
+
+const pastSessions = computed(() => {
+  return sessions.value.filter(s => s.status === 'completed')
+})
+
+const cancelledSessions = computed(() => {
+  return sessions.value.filter(s => s.status === 'cancelled')
+})
+
+onMounted(() => {
+  fetchSessions()
+})
 
 const tabs = computed(() => [
   { key: 'upcoming', label: 'Upcoming', count: upcomingSessions.value.length },
@@ -24,7 +91,7 @@ const dashStats = computed(() => [
   { value: String(upcomingSessions.value.length), label: 'Upcoming Sessions', bg: '#E8F0FE', iconColor: '#4A90D9' },
   { value: String(pastSessions.value.length), label: 'Completed', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
   { value: '4.7', label: 'Avg Rating Given', bg: '#E8F0FE', iconColor: '#4A90D9' },
-  { value: '$372.50', label: 'Total Invested', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: `$${pastSessions.value.reduce((sum, s) => sum + s.price, 0).toFixed(2)}`, label: 'Total Invested', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
 ])
 </script>
 
@@ -58,7 +125,7 @@ const dashStats = computed(() => [
             <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
+                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }}</h3>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background-color:#E8F0FE;color:#4A90D9">Upcoming</span>
               </div>
               <p class="text-sm mt-1" style="color:#1B3A5C;opacity:0.7">with {{ session.tutorName }}</p>
@@ -86,7 +153,7 @@ const dashStats = computed(() => [
             <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
+                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }}</h3>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background-color:rgba(46,170,79,0.1);color:#2EAA4F">Completed</span>
               </div>
               <p class="text-sm mt-1" style="color:#1B3A5C;opacity:0.7">with {{ session.tutorName }}</p>
@@ -106,7 +173,7 @@ const dashStats = computed(() => [
             <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0 grayscale" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
+                <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }}</h3>
                 <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" style="background-color:rgba(239,68,68,0.1);color:#ef4444">Cancelled</span>
               </div>
               <p class="text-sm mt-1" style="color:#1B3A5C;opacity:0.7">with {{ session.tutorName }}</p>
