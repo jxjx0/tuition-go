@@ -14,6 +14,7 @@ interface Session {
   status: string
   meetingLink: string | null
   notes: string | null
+  durationMins: number
 }
 
 function fmtDate(d: string) { 
@@ -61,7 +62,8 @@ const fetchSessions = async () => {
       price: session.totalPrice || 0,
       status: session.status || 'pending',
       meetingLink: session.meetingLink,
-      notes: null
+      notes: null,
+      durationMins: session.durationMins || 0
     }))
   } catch (err: any) {
     error.value = err.message
@@ -94,12 +96,24 @@ const tabs = computed(() => [
   { key: 'cancelled', label: 'Cancelled', count: cancelledSessions.value.length },
 ])
 
-const dashStats = computed(() => [
-  { value: String(upcomingSessions.value.length), label: 'Upcoming Sessions', bg: '#E8F0FE', iconColor: '#4A90D9' },
-  { value: String(pastSessions.value.length), label: 'Completed', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
-  { value: '4.7', label: 'Avg Rating Given', bg: '#E8F0FE', iconColor: '#4A90D9' },
-  { value: `$${pastSessions.value.reduce((sum, s) => sum + s.price, 0).toFixed(2)}`, label: 'Total Invested', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
-])
+const dashStats = computed(() => {
+  const now = new Date()
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
+  
+  const completedThisMonth = pastSessions.value.filter(s => {
+    const sessionDate = new Date(s.date)
+    return sessionDate.getMonth() === currentMonth && sessionDate.getFullYear() === currentYear
+  })
+  
+  const hoursCompletedThisMonth = completedThisMonth.reduce((sum, s) => sum + s.durationMins, 0) / 60
+  
+  return [
+    { value: String(upcomingSessions.value.length), label: 'Upcoming Sessions', bg: '#E8F0FE', iconColor: '#4A90D9' },
+    { value: String(pastSessions.value.length), label: 'Completed', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+    { value: `${hoursCompletedThisMonth.toFixed(1)}h`, label: 'Hours This Month', bg: '#E8F0FE', iconColor: '#4A90D9' },
+  ]
+})
 </script>
 
 <template>
@@ -112,7 +126,7 @@ const dashStats = computed(() => [
         </div>
         <router-link to="/tutors" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#4A90D9">Book New Session</router-link>
       </div>
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
         <div v-for="stat in dashStats" :key="stat.label" class="rounded-2xl border p-5" style="background-color:#fff;border-color:#E8F0FE">
           <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-3" :style="{backgroundColor:stat.bg}">
             <svg class="w-5 h-5" :style="{color:stat.iconColor}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
