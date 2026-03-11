@@ -54,8 +54,6 @@ services:
     container_name: session-service
     ports:
       - "5003:5003"
-    env_file:
-      - ./atomic/session/.env
     networks:
       - tuition-network
     restart: unless-stopped
