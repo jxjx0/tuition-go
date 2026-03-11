@@ -22,6 +22,7 @@ services:
       - book-session
       - cancel-session
       - rate-tutor
+      - get-sessions
     restart: unless-stopped
 
   # ==================== ATOMIC SERVICES ====================
@@ -132,6 +133,17 @@ services:
     container_name: rate-tutor-service
     ports:
       - "5102:5102"
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  get-sessions:
+    build:
+      context: ./composite/get_sessions
+      dockerfile: Dockerfile
+    container_name: get-sessions-service
+    ports:
+      - "5103:5103"
     networks:
       - tuition-network
     restart: unless-stopped
