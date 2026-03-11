@@ -30,6 +30,7 @@ enhanced_session_model = api.model('EnhancedSession', {
     'createdAt': fields.DateTime(description='Creation timestamp'),
     'updatedAt': fields.DateTime(description='Update timestamp'),
     'tutorName': fields.String(description='The tutor full name'),
+    'tutorImageUrl': fields.String(description='The tutor image URL'),
     'subjectName': fields.String(description='The subject name from TutorSubjects'),
     'totalPrice': fields.Float(description='Total price calculated from hourly rate and duration')
 })
@@ -145,10 +146,13 @@ def _enrich_sessions(sessions):
                 if tutor_response.status_code == 200:
                     tutor_data = tutor_response.json()
                     enhanced_session['tutorName'] = tutor_data.get('name', 'Unknown')
+                    enhanced_session['tutorImageUrl'] = tutor_data.get('imageURL', None)
                 else:
                     enhanced_session['tutorName'] = 'Unknown'
+                    enhanced_session['tutorImageUrl'] = None
             else:
                 enhanced_session['tutorName'] = 'Unknown'
+                enhanced_session['tutorImageUrl'] = None
             
             # Get tutor subject details (hourlyRate and subject name)
             if tutor_id and tutor_subject_id:
@@ -194,6 +198,7 @@ def _enrich_sessions(sessions):
             # Add session with default values on error
             enhanced_session = session.copy()
             enhanced_session.setdefault('tutorName', 'Unknown')
+            enhanced_session.setdefault('tutorImageUrl', None)
             enhanced_session.setdefault('subjectName', 'Unknown')
             enhanced_session.setdefault('totalPrice', 0.0)
             enhanced_sessions.append(enhanced_session)
