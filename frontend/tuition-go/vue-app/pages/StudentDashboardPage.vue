@@ -116,9 +116,23 @@ const dashStats = computed(() => [
           <p class="text-xs font-medium mt-0.5" style="color:#1B3A5C;opacity:0.6">{{ stat.label }}</p>
         </div>
       </div>
-      <div class="flex items-center gap-1 p-1 rounded-xl mb-6" style="background-color:#E8F0FE">
-        <button v-for="tab in tabs" :key="tab.key" @click="activeTab=tab.key" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all" :style="activeTab===tab.key?'background-color:#fff;color:#4A90D9;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.7'">{{ tab.label }} ({{ tab.count }})</button>
+      <div v-if="loading" class="text-center py-20">
+        <div class="inline-block animate-spin">
+          <svg class="w-8 h-8" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </div>
+        <p class="mt-4" style="color:#1B3A5C">Loading your sessions...</p>
       </div>
+      <div v-else-if="error" class="text-center py-20 rounded-2xl border p-8" style="background-color:#fff;border-color:#E8F0FE">
+        <h2 class="text-xl font-bold mb-2" style="color:#ef4444">Error loading sessions</h2>
+        <p class="mb-4" style="color:#1B3A5C;opacity:0.7">{{ error }}</p>
+        <button @click="fetchSessions" class="px-6 py-2 rounded-xl text-sm font-semibold text-white" style="background-color:#4A90D9">Try Again</button>
+      </div>
+      <div v-else>
+        <div class="flex items-center gap-1 p-1 rounded-xl mb-6" style="background-color:#E8F0FE">
+          <button v-for="tab in tabs" :key="tab.key" @click="activeTab=tab.key" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all" :style="activeTab===tab.key?'background-color:#fff;color:#4A90D9;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.7'">{{ tab.label }} ({{ tab.count }})</button>
+        </div>
       <div v-if="activeTab==='upcoming'" class="space-y-4">
         <div v-for="session in upcomingSessions" :key="session.id" class="rounded-2xl border p-5 hover:shadow-sm" style="background-color:#fff;border-color:#E8F0FE">
           <div class="flex flex-col sm:flex-row items-start gap-4">
@@ -184,6 +198,7 @@ const dashStats = computed(() => [
         <div v-if="!cancelledSessions.length" class="text-center py-16 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
           <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No cancelled sessions</p>
         </div>
+      </div>
       </div>
     </div>
   </div>
