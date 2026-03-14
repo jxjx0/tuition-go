@@ -2,6 +2,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { findTutorById } from "../composables/useTutors"
+import { tutorApi } from '../services/tutorApi'
 
 const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'Chinese', 'Malay', 'Tamil', 'History', 'Geography', 'Computer Science', 'Economics', 'Accounting', 'Literature', 'Art', 'Music']
 const LEVELS = ['Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6', 'Secondary 1', 'Secondary 2', 'Secondary 3', 'Secondary 4', 'JC/A-Level', 'IB', 'University']
@@ -13,7 +14,7 @@ const tabs = [
 
 const route = useRoute()
 const tutorId = computed(() => route.params.id as string)
-const { tutor, searchForTutor, updateProfile, addSubject, deleteSubject, loading } = findTutorById()
+const { tutor, searchForTutor, addSubject, deleteSubject, loading } = findTutorById()
 
 const form = reactive({
   name: "",
@@ -176,7 +177,9 @@ async function saveProfile() {
     if (form.profileImage) {
       formData.append("profileImage", form.profileImage)
     }
-    await updateProfile(tutorId.value, formData)
+    await tutorApi.put(`/tutor/${tutorId.value}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" }
+    })
     alert("Profile updated successfully")
     originalData.value = JSON.stringify(normalizeForm())
     form.photo = null
