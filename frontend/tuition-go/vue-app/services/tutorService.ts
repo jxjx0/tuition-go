@@ -13,6 +13,10 @@ export function useTutorService() {
       return publicApi.get('/tutors/tutors/search', { params })
     },
 
+    register(payload: { name: string; email: string; clerkUserId: string; phone?: string; password?: string }) {
+      return api.post('/tutors/tutor/register', payload)
+    },
+
     getById(tutorId: string) {
       return publicApi.get(`/tutors/tutor/${tutorId}`)
     },

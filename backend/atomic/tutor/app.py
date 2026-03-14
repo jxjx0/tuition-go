@@ -237,7 +237,6 @@ class GetTutorById(Resource):
 #POST register/create tutor
 @api.route("/tutor/register")
 class TutorRegister(Resource):
-    @require_auth
     def post(self):
         data = request.get_json()
 
@@ -250,8 +249,13 @@ class TutorRegister(Resource):
         password = data.get("password")
         clerk_user_id = data.get("clerkUserId")
 
-        if not name or not email:
-            return {"error": "Name and email are required"}, 400
+        # If name is missing, generate it from email
+        if not name and email:
+            name = email.split("@")[0]
+
+        if not name or not email or not clerk_user_id:
+            return {"error": "name, email, and clerkUserId are required"}, 400
+
         
         #ensure the email is gmail
         email_regex = r'^[a-zA-Z0-9._%+-]+@gmail\.com$'
@@ -270,6 +274,18 @@ class TutorRegister(Resource):
 
         if existing.data and len(existing.data) > 0:
             return {"error": "Email already exists"}, 400
+        
+        # Check if a student with this clerkUserId already exists
+        existing2 = (
+            supabase
+            .table("Tutor")
+            .select("tutorId")
+            .eq("clerkUserId", clerk_user_id)
+            .execute()
+        )
+        
+        if existing2.data and len(existing2.data) > 0:
+            return {"error": "User already exists"}, 400
 
         #Hash password if provided
         password_hash = None

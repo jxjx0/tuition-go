@@ -27,6 +27,7 @@ export function useApi() {
     authApi.interceptors.request.use(async (config) => {
       const token = await getToken.value()
       if (token) {
+        //jwt token using Clerk_auth.py doing the authentication
         config.headers.Authorization = `Bearer ${token}`
       }
       return config

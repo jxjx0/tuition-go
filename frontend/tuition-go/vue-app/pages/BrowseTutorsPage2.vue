@@ -82,7 +82,7 @@ watch([searchQuery, subjectFilter, levelFilter, sortBy], () => {
       <div class="rounded-2xl p-4 md:p-6 mb-8 border" style="background-color:#fff;border-color:#E8F0FE">
         <div class="flex flex-col md:flex-row gap-4">
           <div class="flex-1 relative">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <svg class="absolute left-3 top-1/2 -translate-y-[25%] w-5 h-5" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
             </svg>
             <input v-model="searchQuery" type="text" placeholder="Search by name ..." class="w-full pl-10 pr-4 py-3 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>

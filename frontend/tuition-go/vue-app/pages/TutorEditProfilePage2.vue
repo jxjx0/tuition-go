@@ -2,6 +2,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { findTutorById } from "../composables/useTutors"
+import { useUser } from '@clerk/vue'
 
 const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'Chinese', 'Malay', 'Tamil', 'History', 'Geography', 'Computer Science', 'Economics', 'Accounting', 'Literature', 'Art', 'Music']
 const LEVELS = ['Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6', 'Secondary 1', 'Secondary 2', 'Secondary 3', 'Secondary 4', 'JC/A-Level', 'IB', 'University']
@@ -10,6 +11,8 @@ const tabs = [
   { key: 'personal', label: 'Personal Info', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   { key: 'teaching', label: 'Teaching Details', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
 ]
+
+const { user, isLoaded } = useUser()
 
 const route = useRoute()
 const tutorId = computed(() => route.params.id as string)
@@ -98,11 +101,12 @@ const passwordStrength = computed(() => {
 function validate(): boolean {
   Object.keys(errors).forEach((k) => delete errors[k])
   if (!form.name.trim()) errors.name = 'Name is required'
-  if (!form.phone.trim()) errors.phone = 'Phone number is required'
-  if (form.password && form.password.length < 6) errors.password = 'Password must be at least 6 characters'
-  if (!form.bio.trim()) errors.bio = 'Bio is required'
-  else if (form.bio.length > 500) errors.bio = 'Bio must be under 500 characters'
-  if (form.teachingPairs.length === 0) errors.teachingPairs = 'Add at least one subject and level'
+  if (form.password && form.password.length < 6) 
+    errors.password = 'Password must be at least 6 characters'
+  if (form.bio.length > 500)
+    errors.bio = 'Bio must be under 500 characters'
+  if (form.teachingPairs.length === 0) 
+    errors.teachingPairs = 'Add at least one subject and level'
   return Object.keys(errors).length === 0
 }
 
@@ -177,13 +181,19 @@ async function saveProfile() {
       formData.append("profileImage", form.profileImage)
     }
     await updateProfile(tutorId.value, formData)
-    alert("Profile updated successfully")
     originalData.value = JSON.stringify(normalizeForm())
     form.photo = null
+    form.profileImage = null  // ← also reset this
     saved.value = true
     setTimeout(() => { saved.value = false }, 3000)
-  } catch (err) {
-    console.error(err)
+  } catch (err: any) {
+    // Surface the actual API error to the user instead of silent failure
+    const message = err?.response?.data?.error 
+      || err?.response?.data?.message 
+      || err?.message 
+      || 'Failed to save profile. Please try again.'
+    errors.general = message
+    console.error('saveProfile error:', err)
   } finally {
     saving.value = false
   }
@@ -412,6 +422,7 @@ watch(activeTab, () => { saved.value = false })
           </div>
         </div>
       </div>
+      <!-- <button @click="console.log('test')">Test Click</button> -->
 
       <div v-if="saved" class="fixed bottom-6 right-6 flex items-center gap-3 px-5 py-4 rounded-xl shadow-lg" style="background-color:#fff;border:1px solid #E8F0FE;z-index:50">
         <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background-color:rgba(46,170,79,0.1)">
@@ -427,4 +438,7 @@ watch(activeTab, () => { saved.value = false })
 
     </div>
   </div>
+  <p v-if="errors.general" class="text-xs text-center" style="color:#E74C3C">
+  {{ errors.general }}
+</p>
 </template>
