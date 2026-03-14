@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useUser } from '@clerk/vue'
 import { useSessionService } from '../services/sessionService'
 
 interface Session {
@@ -27,7 +28,11 @@ function fmtTime(d: string) {
 }
 
 const activeTab = ref('upcoming')
-const currentStudentId = '5e97eb66-5fd9-4235-b9c7-788b770ef42a'
+const { user, isLoaded } = useUser()
+const currentStudentId = computed(() => {
+  const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
+  return typeof metadata?.studentId === 'string' ? metadata.studentId : null
+})
 
 const sessions = ref<Session[]>([])
 const loading = ref(false)
@@ -35,10 +40,16 @@ const error = ref<string | null>(null)
 const sessionService = useSessionService()
 
 const fetchSessions = async () => {
+  if (!currentStudentId.value) {
+    sessions.value = []
+    error.value = 'Student profile is not linked to this account yet.'
+    return
+  }
+
   loading.value = true
   error.value = null
   try {
-    const { data } = await sessionService.getStudentSessions(currentStudentId)
+    const { data } = await sessionService.getStudentSessions(currentStudentId.value)
 
     // Transform the API response to match the component's expected format
     sessions.value = data.map((session: any) => ({
@@ -82,8 +93,20 @@ const cancelledSessions = computed(() => {
 })
 
 onMounted(() => {
-  fetchSessions()
+  if (isLoaded.value && currentStudentId.value) {
+    fetchSessions()
+  }
 })
+
+watch(
+  () => [isLoaded.value, currentStudentId.value],
+  ([loaded, studentId]) => {
+    if (loaded && studentId) {
+      fetchSessions()
+    }
+  },
+  { immediate: true }
+)
 
 const tabs = computed(() => [
   { key: 'upcoming', label: 'Upcoming', count: upcomingSessions.value.length },
@@ -157,7 +180,7 @@ const dashStats = computed(() => {
       <div v-if="activeTab==='upcoming'" class="space-y-4">
         <div v-for="session in upcomingSessions" :key="session.id" class="rounded-2xl border p-5 hover:shadow-sm" style="background-color:#fff;border-color:#E8F0FE">
           <div class="flex flex-col sm:flex-row items-start gap-4">
-            <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
+            <img :src="session.tutorAvatar || undefined" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
@@ -185,7 +208,7 @@ const dashStats = computed(() => {
       <div v-if="activeTab==='past'" class="space-y-4">
         <div v-for="session in pastSessions" :key="session.id" class="rounded-2xl border p-5 hover:shadow-sm" style="background-color:#fff;border-color:#E8F0FE">
           <div class="flex flex-col sm:flex-row items-start gap-4">
-            <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
+            <img :src="session.tutorAvatar || undefined" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 flex-wrap">
                 <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
@@ -205,7 +228,7 @@ const dashStats = computed(() => {
       <div v-if="activeTab==='cancelled'" class="space-y-4">
         <div v-for="session in cancelledSessions" :key="session.id" class="rounded-2xl border p-5 opacity-70" style="background-color:#fff;border-color:#E8F0FE">
           <div class="flex flex-col sm:flex-row items-start gap-4">
-            <img :src="session.tutorAvatar" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0 grayscale" crossorigin="anonymous" style="background-color:#E8F0FE"/>
+            <img :src="session.tutorAvatar || undefined" :alt="session.tutorName" class="w-14 h-14 rounded-xl object-cover flex-shrink-0 grayscale" crossorigin="anonymous" style="background-color:#E8F0FE"/>
             <div class="flex-1">
               <div class="flex items-center gap-2 flex-wrap">
                 <h3 class="text-base font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
