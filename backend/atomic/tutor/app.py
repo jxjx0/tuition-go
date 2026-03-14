@@ -6,6 +6,7 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from clerk_auth import require_auth
 import os
 
 load_dotenv()
@@ -236,6 +237,7 @@ class GetTutorById(Resource):
 #POST register/create tutor
 @api.route("/tutor/register")
 class TutorRegister(Resource):
+    @require_auth
     def post(self):
         data = request.get_json()
 
@@ -298,6 +300,7 @@ class TutorRegister(Resource):
 #Accept file from frontend (multipart/form-data)
 @api.route("/tutor/<string:tutorID>")
 class UpdateTutor(Resource):
+    @require_auth
     def put(self, tutorID):
 
         form = request.form
@@ -370,6 +373,7 @@ class UpdateTutor(Resource):
 #DELETE delete tutor user
 @api.route("/tutor/<string:tutorID>")
 class DeleteTutor(Resource):
+    @require_auth
     def delete(self, tutorID):
         try:
             response = (
@@ -390,6 +394,7 @@ class DeleteTutor(Resource):
 @api.route("/tutor/updateRating")
 class UpdateTutorRating(Resource):
 
+    @require_auth
     def put(self):
         data = request.get_json()
 
@@ -446,6 +451,7 @@ class UpdateTutorRating(Resource):
 @api.route("/tutor/<string:tutorId>/subjects")
 class TutorAddSubject(Resource):
 
+    @require_auth
     def post(self, tutorId):
         data = request.get_json()
 
@@ -537,6 +543,7 @@ class TutorSubjects(Resource):
 @api.route("/tutor/<string:tutorId>/subjects/<string:subjectId>")
 class UpdateTutorSubject(Resource):
 
+    @require_auth
     def put(self, tutorId, subjectId):
         data = request.get_json()
 
@@ -571,6 +578,7 @@ class UpdateTutorSubject(Resource):
 #DELETE delete subject that the tutor taught
 @api.route("/tutor/<string:tutorId>/subjects/<string:subjectId>")
 class DeleteTutorSubject(Resource):
+    @require_auth
     def delete(self, tutorId, subjectId):
         try:
             response = (supabase.table("TutorSubjects").delete().eq("tutorSubjectId", subjectId).eq("tutorId", tutorId).execute())

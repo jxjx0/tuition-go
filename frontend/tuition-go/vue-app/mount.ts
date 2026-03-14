@@ -27,8 +27,18 @@ const routes = [
   { path: '/tutors2', name: 'tutors', component: BrowseTutorsPage },
   { path: '/tutors/:id', name: 'tutor-detail2', component: TutorDetailPage2, props: true },
   { path: '/tutors2/:id', name: 'tutor-detail', component: TutorDetailPage, props: true },
-  { path: '/dashboard', name: 'dashboard', component: StudentDashboardPage },
-  { path: '/tutor-dashboard', name: 'tutor-dashboard', component: TutorDashboardPage },
+  {
+    path: '/dashboard',
+    name: 'dashboard',
+    component: StudentDashboardPage,
+    meta: { requiresAuth: true, role: 'student' },
+  },
+  {
+    path: '/tutor-dashboard',
+    name: 'tutor-dashboard',
+    component: TutorDashboardPage,
+    meta: { requiresAuth: true, role: 'tutor' },
+  },
   { path: '/book/:sessionId', name: 'book-session', component: BookSessionPage, props: true },
   { path: '/session/:id', name: 'session-detail', component: SessionDetailPage, props: true },
   { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
@@ -43,6 +53,42 @@ export function mountVueApp(el: HTMLElement) {
     history: createWebHistory(),
     routes,
     scrollBehavior() { return { top: 0 } },
+  })
+
+  router.beforeEach(async (to) => {
+    const requiresAuth = Boolean(to.meta.requiresAuth)
+    const requiredRole = typeof to.meta.role === 'string' ? to.meta.role : null
+
+    if (!requiresAuth) {
+      return true
+    }
+
+    const clerk = (window as any).Clerk
+
+    if (!clerk) {
+      return {
+        path: '/login',
+        query: { redirect: to.fullPath },
+      }
+    }
+
+    if (!clerk.loaded) {
+      await clerk.load()
+    }
+
+    if (!clerk.user) {
+      return {
+        path: '/login',
+        query: { redirect: to.fullPath },
+      }
+    }
+
+    const userRole = clerk.user.unsafeMetadata?.role
+    if (requiredRole && userRole !== requiredRole) {
+      return userRole === 'tutor' ? '/tutor-dashboard' : '/dashboard'
+    }
+
+    return true
   })
 
   const app = createApp(App)
