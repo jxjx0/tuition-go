@@ -1,5 +1,5 @@
 import { ref } from "vue"
-import { tutorApi } from "../services/tutorApi"
+import { useTutorService } from "../services/tutorService"
 
 interface TutorSubject {
     subject: string
@@ -25,6 +25,7 @@ export function useTutors() {
     const tutors = ref<Tutor[]>([])
     const loading = ref(false)
     const error = ref(null)
+    const tutorService = useTutorService()
 
     async function searchTutors(filters:any = {}) {
         loading.value = true
@@ -32,13 +33,11 @@ export function useTutors() {
 
         try {
 
-        const response = await tutorApi.get("/tutors/search", {
-            params: {
+        const response = await tutorService.search({
             subject: filters.subject,
             academicLevel: filters.level,
             name: filters.name,
             sort: filters.sort
-            }
         })
 
         tutors.value = response.data
@@ -64,13 +63,14 @@ export function findTutorById() {
     const tutor = ref<Tutor | null>(null)
     const loading = ref(false)
     const error = ref(null)
+    const tutorService = useTutorService()
 
     async function searchForTutor(tutorId: string) {
         loading.value = true
         error.value = null
 
         try {
-            const response = await tutorApi.get(`/tutor/${tutorId}`)
+            const response = await tutorService.getById(tutorId)
 
             // store result reactively
             tutor.value = response.data
@@ -91,7 +91,7 @@ export function findTutorById() {
         hourlyRate: number,
     ) {
         try {
-        const response = await tutorApi.post(`/tutor/${tutorId}/subjects`, {
+        const response = await tutorService.addSubject(tutorId, {
             subject,
             academicLevel,
             hourlyRate,
@@ -107,12 +107,23 @@ export function findTutorById() {
         }
     }
 
+    async function updateProfile(tutorId: string, formData: FormData) {
+        try {
+            const response = await tutorService.updateProfile(tutorId, formData)
+            return response.data
+        } catch (err: any) {
+            error.value = err
+            console.error(err)
+            throw err
+        }
+    }
+
     async function deleteSubject(
         tutorId: string,
         subjectId: string
     ) {
         try {
-        const response = await tutorApi.delete(`/tutor/${tutorId}/subjects/${subjectId}`);
+        const response = await tutorService.deleteSubject(tutorId, subjectId);
 
         return response.data;
         } catch (err: any) {
