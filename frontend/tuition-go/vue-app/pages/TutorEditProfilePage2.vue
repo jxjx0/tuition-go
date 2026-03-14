@@ -242,7 +242,7 @@ watch(activeTab, () => { saved.value = false })
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Name</label>
             <div class="relative">
-              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
               </svg>
               <input v-model="form.name" type="text" placeholder="Your full name" class="w-full pl-11 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" :style="{ borderColor: errors.name ? '#E74C3C' : '#E8F0FE', color: '#1B3A5C' }"/>
@@ -253,7 +253,7 @@ watch(activeTab, () => { saved.value = false })
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Email</label>
             <div class="relative">
-              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color:#4A90D9;opacity:0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9;opacity:0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
               </svg>
               <input :value="form.email" type="email" disabled class="w-full pl-11 pr-4 py-3 rounded-xl text-sm border cursor-not-allowed" style="border-color:#E8F0FE;color:rgba(27,58,92,0.5);background-color:#F5F7FA"/>
@@ -264,7 +264,7 @@ watch(activeTab, () => { saved.value = false })
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Phone Number</label>
             <div class="relative">
-              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
               </svg>
               <input v-model="form.phone" type="tel" placeholder="+65 9123 4567" class="w-full pl-11 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" :style="{ borderColor: errors.phone ? '#E74C3C' : '#E8F0FE', color: '#1B3A5C' }"/>
@@ -275,11 +275,11 @@ watch(activeTab, () => { saved.value = false })
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Password</label>
             <div class="relative">
-              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
               </svg>
               <input v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="Enter new password" class="w-full pl-11 pr-12 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" :style="{ borderColor: errors.password ? '#E74C3C' : '#E8F0FE', color: '#1B3A5C' }"/>
-              <button type="button" @click="showPassword = !showPassword" class="absolute right-4 top-1/2 -translate-y-1/2 p-0.5" style="color:#4A90D9">
+              <button type="button" @click="showPassword = !showPassword" class="absolute right-4 top-1/2 -translate-y-[25%] p-0.5" style="color:#4A90D9">
                 <svg v-if="!showPassword" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                   <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -326,7 +326,7 @@ watch(activeTab, () => { saved.value = false })
                   <option value="" disabled>Select subject</option>
                   <option v-for="subj in SUBJECTS" :key="subj" :value="subj">{{ subj }}</option>
                 </select>
-                <svg class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style="color:rgba(27,58,92,0.3)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 absolute right-4 top-1/2 -translate-y-[25%] pointer-events-none" style="color:rgba(27,58,92,0.3)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                 </svg>
               </div>
@@ -335,12 +335,12 @@ watch(activeTab, () => { saved.value = false })
                   <option value="" disabled>Select level</option>
                   <option v-for="lvl in LEVELS" :key="lvl" :value="lvl">{{ lvl }}</option>
                 </select>
-                <svg class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style="color:rgba(27,58,92,0.3)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 absolute right-4 top-1/2 -translate-y-[25%] pointer-events-none" style="color:rgba(27,58,92,0.3)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                 </svg>
               </div>
               <div class="w-full sm:w-32 relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold" style="color:#4A90D9">$</span>
+                <span class="absolute left-4 top-1/2 -translate-y-[25%] text-sm font-bold" style="color:#4A90D9">$</span>
                 <input v-model.number="newHourlyRate" type="number" min="10" step="5" placeholder="Rate" class="w-full pl-9 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" style="border-color:#E8F0FE;color:#1B3A5C;background-color:#fff"/>
               </div>
               <button :disabled="loading" @click="addPair" class="px-6 py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 shadow-sm" style="background-color:#4A90D9;white-space:nowrap">
