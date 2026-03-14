@@ -44,6 +44,8 @@ services:
     container_name: tutor-service
     ports:
       - "5002:5002"
+    environment:
+      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
     networks:
       - tuition-network
     restart: unless-stopped
@@ -55,6 +57,8 @@ services:
     container_name: session-service
     ports:
       - "5003:5003"
+    environment:
+      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
     networks:
       - tuition-network
     restart: unless-stopped
@@ -144,6 +148,8 @@ services:
     container_name: get-sessions-service
     ports:
       - "5103:5103"
+    environment:
+      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
     networks:
       - tuition-network
     restart: unless-stopped

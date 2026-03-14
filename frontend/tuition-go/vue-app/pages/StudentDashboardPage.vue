@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useSessionService } from '../services/sessionService'
 
 interface Session {
   id: string
@@ -31,24 +32,14 @@ const currentStudentId = '5e97eb66-5fd9-4235-b9c7-788b770ef42a'
 const sessions = ref<Session[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+const sessionService = useSessionService()
 
 const fetchSessions = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/getsessions/student/${currentStudentId}/sessions`)
-    
-    // Handle 404 as "no sessions" instead of an error
-    if (response.status === 404) {
-      sessions.value = []
-      return
-    }
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch sessions: ${response.statusText}`)
-    }
-    const data = await response.json()
-    
+    const { data } = await sessionService.getStudentSessions(currentStudentId)
+
     // Transform the API response to match the component's expected format
     sessions.value = data.map((session: any) => ({
       id: session.sessionId,
@@ -66,6 +57,10 @@ const fetchSessions = async () => {
       durationMins: session.durationMins || 0
     }))
   } catch (err: any) {
+    if (err.response?.status === 404) {
+      sessions.value = []
+      return
+    }
     error.value = err.message
     console.error('Error fetching sessions:', err)
     sessions.value = []

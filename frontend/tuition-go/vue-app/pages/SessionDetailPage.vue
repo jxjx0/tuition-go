@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useSessionService } from '../services/sessionService'
 
 interface Session {
   id: string
@@ -37,6 +38,7 @@ const session = ref<Session | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showCancel = ref(false)
+const sessionService = useSessionService()
 
 const statusLabel = computed(() => { 
   if (!session.value) return ''
@@ -56,18 +58,8 @@ async function fetchSession() {
     loading.value = true
     error.value = null
     const sessionId = route.params.id as string
-    const response = await fetch(`http://localhost:8000/api/v1/getsessions/session/${sessionId}`)
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        error.value = 'Session not found'
-      } else {
-        error.value = 'Failed to load session'
-      }
-      return
-    }
-    
-    const data = await response.json()
+    const { data } = await sessionService.getSessionById(sessionId)
+
     session.value = {
       id: data.sessionId,
       tutorId: data.tutorId,
@@ -87,8 +79,12 @@ async function fetchSession() {
       date: data.startTime,
       price: data.totalPrice
     }
-  } catch (err) {
-    error.value = 'Error loading session'
+  } catch (err: any) {
+    if (err.response?.status === 404) {
+      error.value = 'Session not found'
+    } else {
+      error.value = 'Failed to load session'
+    }
     console.error('Failed to fetch session:', err)
   } finally {
     loading.value = false

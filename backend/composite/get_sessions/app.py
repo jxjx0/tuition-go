@@ -3,6 +3,7 @@ from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 import requests
 from datetime import datetime
+from clerk_auth import require_auth
 
 app = Flask(__name__)
 CORS(app)
@@ -15,6 +16,14 @@ api = Api(app, doc="/docs",
 # Service URLs
 SESSION_SERVICE_URL = "http://session:5003"
 TUTOR_SERVICE_URL = "http://tutor:5002"
+
+
+def _get_auth_headers():
+    """Forward the Authorization header from the incoming request."""
+    auth = request.headers.get("Authorization", "")
+    if auth:
+        return {"Authorization": auth}
+    return {}
 
 # Response model
 enhanced_session_model = api.model('EnhancedSession', {
@@ -45,6 +54,7 @@ class Health(Resource):
 
 @api.route("/student/<string:studentId>/sessions")
 class StudentSessions(Resource):
+    @require_auth
     @api.marshal_list_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved sessions')
     @api.response(404, 'No sessions found for student')
@@ -53,9 +63,11 @@ class StudentSessions(Resource):
         """Retrieve all sessions for a student with tutor details and pricing"""
         try:
             # 1. Get all sessions for the student
+            auth_headers = _get_auth_headers()
             sessions_response = requests.get(
                 f"{SESSION_SERVICE_URL}/sessions",
                 params={"studentId": studentId},
+                headers=auth_headers,
                 timeout=5
             )
             
@@ -87,6 +99,7 @@ class StudentSessions(Resource):
 
 @api.route("/tutor/<string:tutorId>/sessions")
 class TutorSessions(Resource):
+    @require_auth
     @api.marshal_list_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved sessions')
     @api.response(404, 'No sessions found for tutor')
@@ -95,9 +108,11 @@ class TutorSessions(Resource):
         """Retrieve all sessions for a tutor with student details and pricing"""
         try:
             # 1. Get all sessions for the tutor
+            auth_headers = _get_auth_headers()
             sessions_response = requests.get(
                 f"{SESSION_SERVICE_URL}/sessions",
                 params={"tutorId": tutorId},
+                headers=auth_headers,
                 timeout=5
             )
             
@@ -129,6 +144,7 @@ class TutorSessions(Resource):
 
 @api.route("/session/<string:sessionId>")
 class SessionDetail(Resource):
+    @require_auth
     @api.marshal_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved session')
     @api.response(404, 'Session not found')
@@ -137,8 +153,10 @@ class SessionDetail(Resource):
         """Retrieve a specific session by ID with tutor details and pricing"""
         try:
             # 1. Get the specific session
+            auth_headers = _get_auth_headers()
             session_response = requests.get(
                 f"{SESSION_SERVICE_URL}/session/{sessionId}",
+                headers=auth_headers,
                 timeout=5
             )
             
