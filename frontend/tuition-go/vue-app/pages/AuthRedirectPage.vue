@@ -3,6 +3,7 @@ import { watch, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUser } from '@clerk/vue'
 import { useStudentService } from '../services/studentService'
+import { useTutorService } from "../services/tutorService"
 
 const router = useRouter()
 const { user } = useUser()
@@ -10,6 +11,7 @@ const error = ref<string | null>(null)
 
 // Call at setup level so useAuth() inside runs in the right context
 const studentService = useStudentService()
+const tutorService = useTutorService()
 
 async function registerStudentIfNeeded(u: NonNullable<typeof user.value>): Promise<boolean> {
   const metadata = u.unsafeMetadata as Record<string, unknown>
@@ -43,6 +45,38 @@ async function registerStudentIfNeeded(u: NonNullable<typeof user.value>): Promi
   }
 }
 
+async function registerTutorIfNeeded(u: NonNullable<typeof user.value>): Promise<boolean> {
+  const metadata = u.unsafeMetadata as Record<string, unknown>
+
+  // Already registered
+  if (metadata?.tutorId) return true
+
+  try {
+    const response = await tutorService.register({
+      name: u.fullName ?? u.firstName ?? '',
+      email: u.primaryEmailAddress?.emailAddress ?? '',
+      clerkUserId: u.id,
+    })
+
+    const tutorId: string = response.data.tutorId
+
+    // Save tutorId back into Clerk metadata
+    await u.update({
+      unsafeMetadata: {
+        ...metadata,
+        role: 'tutor',
+        tutorId,
+      },
+    })
+
+    return true
+  } catch (err: any) {
+    console.error('Tutor registration failed:', err)
+    error.value = 'Failed to set up your tutor profile. Please refresh and try again.'
+    return false
+  }
+}
+
 watch(
   () => user.value,
   async (u) => {
@@ -50,8 +84,14 @@ watch(
 
     const role = (u.unsafeMetadata as Record<string, unknown>)?.role
 
+    // Tutor flow: ensure record exists in DB before navigating
     if (role === 'tutor') {
-      router.replace('/tutor-dashboard')
+      const ok = await registerTutorIfNeeded(u)
+
+      if (ok) {
+        router.replace('/tutor-dashboard')
+      }
+      // If not ok, error message is shown and user stays on page to retry
       return
     }
 

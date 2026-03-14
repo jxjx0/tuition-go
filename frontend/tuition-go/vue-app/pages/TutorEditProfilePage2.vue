@@ -2,6 +2,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { findTutorById } from "../composables/useTutors"
+import { useUser } from '@clerk/vue'
 
 const SUBJECTS = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'Chinese', 'Malay', 'Tamil', 'History', 'Geography', 'Computer Science', 'Economics', 'Accounting', 'Literature', 'Art', 'Music']
 const LEVELS = ['Primary 1', 'Primary 2', 'Primary 3', 'Primary 4', 'Primary 5', 'Primary 6', 'Secondary 1', 'Secondary 2', 'Secondary 3', 'Secondary 4', 'JC/A-Level', 'IB', 'University']
@@ -10,6 +11,8 @@ const tabs = [
   { key: 'personal', label: 'Personal Info', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   { key: 'teaching', label: 'Teaching Details', icon: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253' },
 ]
+
+const { user, isLoaded } = useUser()
 
 const route = useRoute()
 const tutorId = computed(() => route.params.id as string)
@@ -51,7 +54,7 @@ watch(tutor, (t) => {
   form.phone = t.phone?.toString() || "";
   form.bio = t.bio || "";
 
-  avatarPreview.value = t.imageURL;
+  avatarPreview.value = t.imageURL || '/no_image.jpg';
 
   form.teachingPairs = (t.subjects || []).map((s: any) => ({
     subject: s.subject,
@@ -98,11 +101,12 @@ const passwordStrength = computed(() => {
 function validate(): boolean {
   Object.keys(errors).forEach((k) => delete errors[k])
   if (!form.name.trim()) errors.name = 'Name is required'
-  if (!form.phone.trim()) errors.phone = 'Phone number is required'
-  if (form.password && form.password.length < 6) errors.password = 'Password must be at least 6 characters'
-  if (!form.bio.trim()) errors.bio = 'Bio is required'
-  else if (form.bio.length > 500) errors.bio = 'Bio must be under 500 characters'
-  if (form.teachingPairs.length === 0) errors.teachingPairs = 'Add at least one subject and level'
+  if (form.password && form.password.length < 6) 
+    errors.password = 'Password must be at least 6 characters'
+  if (form.bio.length > 500)
+    errors.bio = 'Bio must be under 500 characters'
+  if (form.teachingPairs.length === 0) 
+    errors.teachingPairs = 'Add at least one subject and level'
   return Object.keys(errors).length === 0
 }
 
@@ -177,13 +181,19 @@ async function saveProfile() {
       formData.append("profileImage", form.profileImage)
     }
     await updateProfile(tutorId.value, formData)
-    alert("Profile updated successfully")
     originalData.value = JSON.stringify(normalizeForm())
     form.photo = null
+    form.profileImage = null  // ← also reset this
     saved.value = true
     setTimeout(() => { saved.value = false }, 3000)
-  } catch (err) {
-    console.error(err)
+  } catch (err: any) {
+    // Surface the actual API error to the user instead of silent failure
+    const message = err?.response?.data?.error 
+      || err?.response?.data?.message 
+      || err?.message 
+      || 'Failed to save profile. Please try again.'
+    errors.general = message
+    console.error('saveProfile error:', err)
   } finally {
     saving.value = false
   }
@@ -239,7 +249,7 @@ watch(activeTab, () => { saved.value = false })
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Name</label>
             <div class="relative">
-              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
               </svg>
               <input v-model="form.name" type="text" placeholder="Your full name" class="w-full pl-11 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" :style="{ borderColor: errors.name ? '#E74C3C' : '#E8F0FE', color: '#1B3A5C' }"/>
@@ -250,7 +260,7 @@ watch(activeTab, () => { saved.value = false })
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Email</label>
             <div class="relative">
-              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color:#4A90D9;opacity:0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9;opacity:0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
               </svg>
               <input :value="form.email" type="email" disabled class="w-full pl-11 pr-4 py-3 rounded-xl text-sm border cursor-not-allowed" style="border-color:#E8F0FE;color:rgba(27,58,92,0.5);background-color:#F5F7FA"/>
@@ -261,7 +271,7 @@ watch(activeTab, () => { saved.value = false })
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Phone Number</label>
             <div class="relative">
-              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
               </svg>
               <input v-model="form.phone" type="tel" placeholder="+65 9123 4567" class="w-full pl-11 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" :style="{ borderColor: errors.phone ? '#E74C3C' : '#E8F0FE', color: '#1B3A5C' }"/>
@@ -272,11 +282,11 @@ watch(activeTab, () => { saved.value = false })
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Password</label>
             <div class="relative">
-              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
               </svg>
               <input v-model="form.password" :type="showPassword ? 'text' : 'password'" placeholder="Enter new password" class="w-full pl-11 pr-12 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" :style="{ borderColor: errors.password ? '#E74C3C' : '#E8F0FE', color: '#1B3A5C' }"/>
-              <button type="button" @click="showPassword = !showPassword" class="absolute right-4 top-1/2 -translate-y-1/2 p-0.5" style="color:#4A90D9">
+              <button type="button" @click="showPassword = !showPassword" class="absolute right-4 top-1/2 -translate-y-[25%] p-0.5" style="color:#4A90D9">
                 <svg v-if="!showPassword" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                   <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -323,7 +333,7 @@ watch(activeTab, () => { saved.value = false })
                   <option value="" disabled>Select subject</option>
                   <option v-for="subj in SUBJECTS" :key="subj" :value="subj">{{ subj }}</option>
                 </select>
-                <svg class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style="color:rgba(27,58,92,0.3)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 absolute right-4 top-1/2 -translate-y-[25%] pointer-events-none" style="color:rgba(27,58,92,0.3)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                 </svg>
               </div>
@@ -332,12 +342,12 @@ watch(activeTab, () => { saved.value = false })
                   <option value="" disabled>Select level</option>
                   <option v-for="lvl in LEVELS" :key="lvl" :value="lvl">{{ lvl }}</option>
                 </select>
-                <svg class="w-4 h-4 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style="color:rgba(27,58,92,0.3)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <svg class="w-4 h-4 absolute right-4 top-1/2 -translate-y-[25%] pointer-events-none" style="color:rgba(27,58,92,0.3)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                 </svg>
               </div>
               <div class="w-full sm:w-32 relative">
-                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold" style="color:#4A90D9">$</span>
+                <span class="absolute left-4 top-1/2 -translate-y-[25%] text-sm font-bold" style="color:#4A90D9">$</span>
                 <input v-model.number="newHourlyRate" type="number" min="10" step="5" placeholder="Rate" class="w-full pl-9 pr-4 py-3 rounded-xl text-sm border focus:outline-none focus:ring-2" style="border-color:#E8F0FE;color:#1B3A5C;background-color:#fff"/>
               </div>
               <button :disabled="loading" @click="addPair" class="px-6 py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 hover:opacity-90 shadow-sm" style="background-color:#4A90D9;white-space:nowrap">
@@ -412,6 +422,7 @@ watch(activeTab, () => { saved.value = false })
           </div>
         </div>
       </div>
+      <!-- <button @click="console.log('test')">Test Click</button> -->
 
       <div v-if="saved" class="fixed bottom-6 right-6 flex items-center gap-3 px-5 py-4 rounded-xl shadow-lg" style="background-color:#fff;border:1px solid #E8F0FE;z-index:50">
         <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background-color:rgba(46,170,79,0.1)">
@@ -427,4 +438,7 @@ watch(activeTab, () => { saved.value = false })
 
     </div>
   </div>
+  <p v-if="errors.general" class="text-xs text-center" style="color:#E74C3C">
+  {{ errors.general }}
+</p>
 </template>

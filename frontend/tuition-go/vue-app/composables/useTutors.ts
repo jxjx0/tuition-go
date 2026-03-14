@@ -139,6 +139,7 @@ export function findTutorById() {
         tutor,
         loading,
         error,
+        updateProfile,
         searchForTutor,
         addSubject,
         deleteSubject
