@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
 import { mockSessions, mockReviews } from '../composables/useMockData'
 
@@ -9,21 +8,11 @@ function fmtDate(d: string) {
 }
 
 const showCreateSlot = ref(false)
-const { user } = useUser()
-const tutorId = computed(() => {
-  const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
-  return typeof metadata?.tutorId === 'string' ? metadata.tutorId : null
-})
+const tutorId = 't1'
 
-const tutorSessions = computed(() => {
-  if (!tutorId.value) return []
-  return mockSessions.filter(s => s.tutorId === tutorId.value)
-})
+const tutorSessions = computed(() => mockSessions.filter(s => s.tutorId === tutorId))
 const tutorUpcoming = computed(() => tutorSessions.value.filter(s => s.status === 'booked' || s.status === 'available'))
-const tutorReviews = computed(() => {
-  if (!tutorId.value) return []
-  return mockReviews.filter(r => r.tutorId === tutorId.value)
-})
+const tutorReviews = computed(() => mockReviews.filter(r => r.tutorId === tutorId))
 
 const tutorStats = [
   { value: '340', label: 'Total Sessions', bg: '#E8F0FE', iconColor: '#4A90D9' },

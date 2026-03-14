@@ -22,7 +22,6 @@ services:
       - book-session
       - cancel-session
       - rate-tutor
-      - get-sessions
     restart: unless-stopped
 
   # ==================== ATOMIC SERVICES ====================
@@ -33,8 +32,6 @@ services:
     container_name: student-service
     ports:
       - "5001:5001"
-    environment:
-      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
     networks:
       - tuition-network
     restart: unless-stopped
@@ -46,8 +43,6 @@ services:
     container_name: tutor-service
     ports:
       - "5002:5002"
-    environment:
-      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
     networks:
       - tuition-network
     restart: unless-stopped
@@ -59,8 +54,6 @@ services:
     container_name: session-service
     ports:
       - "5003:5003"
-    environment:
-      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
     networks:
       - tuition-network
     restart: unless-stopped
@@ -139,19 +132,6 @@ services:
     container_name: rate-tutor-service
     ports:
       - "5102:5102"
-    networks:
-      - tuition-network
-    restart: unless-stopped
-
-  get-sessions:
-    build:
-      context: ./composite/get_sessions
-      dockerfile: Dockerfile
-    container_name: get-sessions-service
-    ports:
-      - "5103:5103"
-    environment:
-      - CLERK_JWKS_URL=${CLERK_JWKS_URL}
     networks:
       - tuition-network
     restart: unless-stopped

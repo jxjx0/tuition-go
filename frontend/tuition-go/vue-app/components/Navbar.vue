@@ -14,10 +14,6 @@ const { user } = useUser()
 const clerk = useClerk()
 
 const isLoggedIn = computed(() => isSignedIn.value ?? false)
-const userRole = computed(() => {
-  const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
-  return typeof metadata?.role === 'string' ? metadata.role : null
-})
 
 // Auto-assign 'student' role if user signed in without one
 // and redirect to correct dashboard based on role
@@ -34,17 +30,11 @@ watch(() => user.value, async (u) => {
 const userName = computed(() => user.value?.fullName ?? user.value?.firstName ?? 'User')
 const userAvatar = computed(() => user.value?.imageUrl ?? 'https://api.dicebear.com/9.x/notionists/svg?seed=User')
 
-const dashboardLink = computed(() => {
-  if (!isLoggedIn.value) return null
-  if (userRole.value === 'tutor') return { to: '/tutor-dashboard', label: 'Tutor Portal' }
-  return { to: '/dashboard', label: 'My Sessions' }
-})
-
-const navLinks = computed(() => {
-  const links = [{ to: '/tutors', label: 'Browse Tutors' }]
-  if (dashboardLink.value) links.push(dashboardLink.value)
-  return links
-})
+const navLinks = [
+  { to: '/tutors', label: 'Browse Tutors' },
+  { to: '/dashboard', label: 'My Sessions' },
+  { to: '/tutor-dashboard', label: 'Tutor Portal' },
+]
 
 function isActive(path: string) {
   return route.path === path
@@ -87,15 +77,8 @@ async function handleLogout() {
                 </svg>
               </button>
               <div v-if="showUserMenu" class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border py-2 z-50" style="border-color:#E8F0FE">
-                <router-link
-                  v-if="dashboardLink"
-                  :to="dashboardLink.to"
-                  @click="showUserMenu=false"
-                  class="block px-4 py-2.5 text-sm hover:bg-gray-50"
-                  style="color:#1B3A5C"
-                >
-                  {{ dashboardLink.label }}
-                </router-link>
+                <router-link to="/dashboard" @click="showUserMenu=false" class="block px-4 py-2.5 text-sm hover:bg-gray-50" style="color:#1B3A5C">Student Dashboard</router-link>
+                <router-link to="/tutor-dashboard" @click="showUserMenu=false" class="block px-4 py-2.5 text-sm hover:bg-gray-50" style="color:#1B3A5C">Tutor Dashboard</router-link>
                 <div class="border-t my-1" style="border-color:#E8F0FE"></div>
                 <button @click="handleLogout" class="block px-4 py-2.5 text-sm hover:bg-red-50 w-full text-left" style="color:#ef4444">Sign Out</button>
               </div>
