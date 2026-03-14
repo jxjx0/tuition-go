@@ -1,20 +1,48 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { mockSessions } from '../composables/useMockData'
+import { useSessionService } from '../services/sessionService'
+
+interface Session {
+  id: string
+  tutorId: string
+  studentId: string
+  tutorSubjectId: string
+  startTime: string
+  endTime: string
+  status: string
+  durationMins: number
+  meetingLink: string
+  createdAt: string
+  updatedAt: string
+  tutorName: string
+  tutorAvatar: string
+  subject: string
+  level: string
+  date: string
+  price: number
+  notes?: string
+}
 
 function fmtDate(d: string) { 
   return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) 
 }
 
+function fmtTime(d: string) {
+  return new Date(d).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' })
+}
+
 const route = useRoute()
 const router = useRouter()
+const session = ref<Session | null>(null)
+const loading = ref(true)
+const error = ref<string | null>(null)
 const showCancel = ref(false)
-const session = computed(() => mockSessions.find(s => s.id === route.params.id))
+const sessionService = useSessionService()
 
 const statusLabel = computed(() => { 
   if (!session.value) return ''
-  const m: Record<string, string> = { booked: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled', available: 'Available' }
+  const m: Record<string, string> = { pending: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled', available: 'Available' }
   return m[session.value.status] || session.value.status 
 })
 
@@ -25,10 +53,52 @@ const headerStyle = computed(() => {
   return 'background:linear-gradient(135deg,#1B3A5C 0%,#4A90D9 100%)' 
 })
 
+async function fetchSession() {
+  try {
+    loading.value = true
+    error.value = null
+    const sessionId = route.params.id as string
+    const { data } = await sessionService.getSessionById(sessionId)
+
+    session.value = {
+      id: data.sessionId,
+      tutorId: data.tutorId,
+      studentId: data.studentId,
+      tutorSubjectId: data.tutorSubjectId,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      status: data.status,
+      durationMins: data.durationMins,
+      meetingLink: data.meetingLink,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+      tutorName: data.tutorName,
+      tutorAvatar: data.tutorImageUrl || 'https://via.placeholder.com/56?text=Tutor',
+      subject: data.subjectName,
+      level: data.academicLevel,
+      date: data.startTime,
+      price: data.totalPrice
+    }
+  } catch (err: any) {
+    if (err.response?.status === 404) {
+      error.value = 'Session not found'
+    } else {
+      error.value = 'Failed to load session'
+    }
+    console.error('Failed to fetch session:', err)
+  } finally {
+    loading.value = false
+  }
+}
+
 function cancelSession() { 
   showCancel.value = false
   router.push('/dashboard') 
 }
+
+onMounted(() => {
+  fetchSession()
+})
 </script>
 
 <template>
@@ -40,7 +110,19 @@ function cancelSession() {
         </svg>
         Back to Dashboard
       </router-link>
-      <div v-if="session" class="rounded-2xl border overflow-hidden" style="background-color:#fff;border-color:#E8F0FE">
+      <div v-if="loading" class="text-center py-20">
+        <div class="inline-block animate-spin">
+          <svg class="w-8 h-8" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </div>
+        <p class="mt-4" style="color:#1B3A5C">Loading session details...</p>
+      </div>
+      <div v-else-if="error" class="text-center py-20">
+        <h2 class="text-2xl font-bold" style="color:#ef4444">{{ error }}</h2>
+        <router-link to="/dashboard" class="mt-4 inline-block px-6 py-2 rounded-lg text-sm font-semibold text-white" style="background-color:#4A90D9">Back to Dashboard</router-link>
+      </div>
+      <div v-else-if="session" class="rounded-2xl border overflow-hidden" style="background-color:#fff;border-color:#E8F0FE">
         <div class="p-6" :style="headerStyle">
           <span class="px-3 py-1 rounded-full text-xs font-bold mb-3 inline-block" style="background-color:rgba(255,255,255,0.2);color:#fff">{{ statusLabel }}</span>
           <h1 class="text-2xl font-extrabold text-white">{{ session.subject }} ({{ session.level }})</h1>
@@ -62,14 +144,14 @@ function cancelSession() {
             </div>
             <div class="flex items-center justify-between py-3 border-b" style="border-color:#E8F0FE">
               <span class="text-sm" style="color:#1B3A5C;opacity:0.7">Time</span>
-              <span class="text-sm font-semibold" style="color:#1B3A5C">{{ session.startTime }} - {{ session.endTime }} ({{ session.duration }} min)</span>
+              <span class="text-sm font-semibold" style="color:#1B3A5C">{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }} ({{ session.durationMins }} min)</span>
             </div>
           </div>
           <div v-if="session.notes" class="p-4 rounded-xl" style="background-color:#F5F7FA">
             <p class="text-xs font-semibold mb-1" style="color:#1B3A5C">Session Notes</p>
             <p class="text-sm" style="color:#1B3A5C;opacity:0.8">{{ session.notes }}</p>
           </div>
-          <div v-if="session.meetingLink&&session.status==='booked'" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
+          <div v-if="session.meetingLink&&session.status==='pending'" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
             <p class="text-xs font-semibold mb-2" style="color:#1B3A5C">Google Meet</p>
             <a :href="session.meetingLink" target="_blank" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90" style="background-color:#2EAA4F">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -79,7 +161,7 @@ function cancelSession() {
             </a>
           </div>
           <div class="flex flex-col sm:flex-row gap-3">
-            <button v-if="session.status==='booked'&&!showCancel" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
+            <button v-if="session.status==='pending'&&!showCancel" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
             <router-link v-if="session.status==='completed'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
           </div>
           <div v-if="showCancel" class="p-5 rounded-xl border" style="border-color:#ef4444;background-color:rgba(239,68,68,0.03)">
