@@ -285,7 +285,7 @@ class TutorRegister(Resource):
         )
         
         if existing2.data and len(existing2.data) > 0:
-            return {"error": "User already exists"}, 400
+            return existing2.data[0], 200
 
         #Hash password if provided
         password_hash = None
