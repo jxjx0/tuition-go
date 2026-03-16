@@ -58,7 +58,7 @@ async function registerTutorIfNeeded(u: NonNullable<typeof user.value>): Promise
       clerkUserId: u.id,
     })
 
-    const tutorId: string = response.data.tutorId
+    const tutorId: string = (Array.isArray(response.data) ? response.data[0] : response.data).tutorId
 
     // Save tutorId back into Clerk metadata
     await u.update({
@@ -116,7 +116,9 @@ watch(
     <div v-else class="text-center space-y-3">
       <p class="text-sm font-medium" style="color:#ef4444">{{ error }}</p>
       <button
-        @click="error = null; registerStudentIfNeeded(user!).then(ok => { if (ok) router.replace('/dashboard') })"
+        @click="error = null; (user!.unsafeMetadata as any)?.role === 'tutor'
+          ? registerTutorIfNeeded(user!).then(ok => { if (ok) router.replace('/tutor-dashboard') })
+          : registerStudentIfNeeded(user!).then(ok => { if (ok) router.replace('/dashboard') })"
         class="px-5 py-2 rounded-xl text-sm font-semibold text-white"
         style="background-color:#4A90D9"
       >

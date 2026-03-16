@@ -4,7 +4,6 @@ from flask_restx import Api, Resource
 from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from clerk_auth import require_auth
 import traceback
 import os
 
@@ -29,7 +28,7 @@ api = Api(app, doc="/docs",
 # Frontend should then store the returned studentId in Clerk unsafeMetadata.
 @api.route("/student/register")
 class StudentRegister(Resource):
-    @require_auth
+
     def post(self):
         data = request.get_json()
 
@@ -110,7 +109,7 @@ class StudentById(Resource):
             return {"error": str(e)}, 500
 
     # PUT update student profile
-    @require_auth
+
     def put(self, studentId):
         data = request.get_json()
 
@@ -144,7 +143,7 @@ class StudentById(Resource):
             return {"error": str(e)}, 500
 
     # DELETE student account
-    @require_auth
+
     def delete(self, studentId):
         try:
             response = (
@@ -169,7 +168,7 @@ class StudentById(Resource):
 # Used to look up a student record when only the Clerk session is available.
 @api.route("/student/by-clerk/<string:clerkUserId>")
 class StudentByClerkId(Resource):
-    @require_auth
+
     def get(self, clerkUserId):
         try:
             response = (
