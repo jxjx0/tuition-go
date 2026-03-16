@@ -3,7 +3,7 @@ from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 import requests
 from datetime import datetime
-from clerk_auth import require_auth
+
 
 app = Flask(__name__)
 CORS(app)
@@ -54,7 +54,7 @@ class Health(Resource):
 
 @api.route("/student/<string:studentId>/sessions")
 class StudentSessions(Resource):
-    @require_auth
+
     @api.marshal_list_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved sessions')
     @api.response(404, 'No sessions found for student')
@@ -99,7 +99,7 @@ class StudentSessions(Resource):
 
 @api.route("/tutor/<string:tutorId>/sessions")
 class TutorSessions(Resource):
-    @require_auth
+
     @api.marshal_list_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved sessions')
     @api.response(404, 'No sessions found for tutor')
@@ -144,7 +144,7 @@ class TutorSessions(Resource):
 
 @api.route("/session/<string:sessionId>")
 class SessionDetail(Resource):
-    @require_auth
+
     @api.marshal_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved session')
     @api.response(404, 'Session not found')

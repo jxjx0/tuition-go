@@ -1,6 +1,48 @@
 _format_version: "3.0"
 _transform: true
 
+consumers:
+  - username: clerk-user
+    jwt_secrets:
+      - key: "https://right-crow-63.clerk.accounts.dev"   # replace with your Clerk issuer URL
+        algorithm: RS256
+        rsa_public_key: |
+          -----BEGIN PUBLIC KEY-----
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv3EKLQn9LpolA5WkbGZH
+          nImCFfGWXfB56ftUGubjq8njRLE4/YSANkaB0sdHMBqqlXk4tgJGVSw5mN5X0PDO
+          ApZTalp0nk1+KkCmb6otYV3oniRRGBjNtd1WFZ6C6I+vyAMGJhdcdpGLwVQb+RC8
+          RhQPWLF6eWU+9N3P4G3Sl243/sziXN8IH/c1SnIfQ/Ou39VJZ+ETBi6OhQ8tH4QH
+          R10ECR6ha78DEZ4H0ADHE9UfwcTW3JsX65oIvmfjYR4yMJbyMWrKzjJ7sd4zbdZI
+          T8SJXx8NbVPMhN27Q8nO4oL+X1RPPj+DRjrLCjqcrhqIOr3m8ETjgTdFcbQn72dJ
+          mQIDAQAB
+          -----END PUBLIC KEY-----
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "http://localhost:5173"   # Vite dev server
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Authorization
+        - Content-Type
+      exposed_headers:
+        - Authorization
+      credentials: true
+      preflight_continue: false   # Kong responds to OPTIONS itself, JWT plugin never runs
+
+  - name: jwt
+    config:
+      key_claim_name: iss
+      claims_to_verify:
+        - exp
+
 services:
   # Atomic Services
   - name: student-service
