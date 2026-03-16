@@ -2,6 +2,8 @@ _format_version: "3.0"
 _transform: true
 
 consumers:
+  - username: anonymous
+
   - username: clerk-user
     jwt_secrets:
       - key: "https://right-crow-63.clerk.accounts.dev"   # replace with your Clerk issuer URL
@@ -42,6 +44,7 @@ plugins:
       key_claim_name: iss
       claims_to_verify:
         - exp
+      anonymous: anonymous   # no token → anonymous consumer, passes through instead of 401
 
 services:
   # Atomic Services
