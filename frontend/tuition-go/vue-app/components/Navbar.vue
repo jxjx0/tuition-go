@@ -19,6 +19,26 @@ const userRole = computed(() => {
   return typeof metadata?.role === 'string' ? metadata.role : null
 })
 
+const tutorProfileLink = computed(() => {
+  if (!user.value) return null
+
+  const metadata = user.value.unsafeMetadata as Record<string, unknown> | undefined
+  const tutorId = metadata?.tutorId
+
+  if (userRole.value === 'tutor' && typeof tutorId === 'string') {
+    return {
+      to: `/tutor-profile/${tutorId}`,
+      label: 'Edit Profile'
+    }
+  }
+
+  return null
+})
+
+watch(() => user.value, (u) => {
+  console.log("Clerk metadata:", u?.unsafeMetadata)
+}, { immediate: true })
+
 // Auto-assign 'student' role if user signed in without one
 // and redirect to correct dashboard based on role
 watch(() => user.value, async (u) => {
@@ -95,6 +115,14 @@ async function handleLogout() {
                   style="color:#1B3A5C"
                 >
                   {{ dashboardLink.label }}
+                </router-link>
+                <router-link 
+                  v-if="tutorProfileLink" 
+                  :to="tutorProfileLink.to" 
+                  @click="showUserMenu = false"
+                  class="block px-4 py-2.5 text-sm hover:bg-gray-50" 
+                  style="color:#1B3A5C">
+                  {{ tutorProfileLink.label }}
                 </router-link>
                 <div class="border-t my-1" style="border-color:#E8F0FE"></div>
                 <button @click="handleLogout" class="block px-4 py-2.5 text-sm hover:bg-red-50 w-full text-left" style="color:#ef4444">Sign Out</button>
