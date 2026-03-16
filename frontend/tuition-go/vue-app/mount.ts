@@ -45,6 +45,7 @@ const routes = [
   { path: '/tutor-profile/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
   { path: '/tutor-profile2/', name: 'TutorProfile', component: TutorEditProfilePage },
   { path: '/auth-redirect', name: 'auth-redirect', component: AuthRedirectPage },
+  { path: '/debug-meeting', name: 'debug-meeting', component: () => import('./pages/TestMeetingPage.vue') },
 
 ]
 

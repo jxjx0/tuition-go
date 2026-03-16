@@ -2,14 +2,45 @@
 import { ref, computed } from 'vue'
 import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
+import { useMeeting } from '../composables/useMeeting'
 import { mockSessions, mockReviews } from '../composables/useMockData'
 
 function fmtDate(d: string) { 
   return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' }) 
 }
 
-const showCreateSlot = ref(false)
 const { user } = useUser()
+const { loading: meetingLoading, error: meetingError, result: meetingResult, createMeeting } = useMeeting()
+
+const meetingForm = ref({
+  summary: 'Tutor Session',
+  description: '',
+  date: '',
+  startTime: '',
+  endTime: ''
+})
+
+async function handleCreateMeeting() {
+  try {
+    const start = `${meetingForm.value.date}T${meetingForm.value.startTime}:00Z`
+    const end = `${meetingForm.value.date}T${meetingForm.value.endTime}:00Z`
+    
+    await createMeeting({
+      summary: meetingForm.value.summary,
+      description: meetingForm.value.description,
+      start_time: start,
+      end_time: end,
+      attendees: [] // Optional: fetch student email if linked to a specific session
+    })
+    
+    showCreateMeeting.value = false
+  } catch (err) {
+    console.error('Meeting creation failed:', err)
+  }
+}
+
+const showCreateSlot = ref(false)
+const showCreateMeeting = ref(false)
 const tutorId = computed(() => {
   const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
   return typeof metadata?.tutorId === 'string' ? metadata.tutorId : null
@@ -41,7 +72,53 @@ const tutorStats = [
           <h1 class="text-3xl font-extrabold" style="color:#1B3A5C">Tutor Dashboard</h1>
           <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Welcome back, James. Manage your sessions and availability.</p>
         </div>
-        <button @click="showCreateSlot=!showCreateSlot" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#2EAA4F">+ Create Session Slot</button>
+        <div class="flex gap-4">
+          <button @click="showCreateMeeting=!showCreateMeeting; showCreateSlot=false" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#4A90D9">Create Google Meeting</button>
+          <button @click="showCreateSlot=!showCreateSlot; showCreateMeeting=false" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#2EAA4F">+ Create Session Slot</button>
+        </div>
+      </div>
+
+      <!-- Create Google Meeting Form -->
+      <div v-if="showCreateMeeting" class="rounded-2xl border p-6 mb-8" style="background-color:#fff;border-color:#E8F0FE">
+        <h3 class="text-lg font-bold mb-4" style="color:#1B3A5C">Create Google Meeting</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Title</label>
+            <input v-model="meetingForm.summary" type="text" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C" placeholder="e.g. Math Tutoring Session"/>
+          </div>
+          <div>
+            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Date</label>
+            <input v-model="meetingForm.date" type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+          </div>
+          <div>
+            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Start Time (UTC)</label>
+            <input v-model="meetingForm.startTime" type="time" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+          </div>
+          <div>
+            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">End Time (UTC)</label>
+            <input v-model="meetingForm.endTime" type="time" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Description (Optional)</label>
+          <textarea v-model="meetingForm.description" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C" rows="2"></textarea>
+        </div>
+        
+        <div v-if="meetingError" class="mb-4 p-3 rounded-lg bg-red-50 text-red-600 text-xs">
+          {{ meetingError }}
+        </div>
+
+        <div v-if="meetingResult" class="mb-4 p-4 rounded-xl bg-blue-50 border border-blue-100">
+          <p class="text-sm font-bold text-blue-800 mb-2">Meeting Created!</p>
+          <a :href="meetingResult.hangoutLink" target="_blank" class="text-xs text-blue-600 underline font-medium">Join Meeting: {{ meetingResult.hangoutLink }}</a>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button @click="handleCreateMeeting" :disabled="meetingLoading" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style="background-color:#4A90D9">
+            {{ meetingLoading ? 'Creating...' : 'Create Meeting' }}
+          </button>
+          <button @click="showCreateMeeting=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">Cancel</button>
+        </div>
       </div>
       <div v-if="showCreateSlot" class="rounded-2xl border p-6 mb-8" style="background-color:#fff;border-color:#E8F0FE">
         <h3 class="text-lg font-bold mb-4" style="color:#1B3A5C">New Session Slot</h3>
