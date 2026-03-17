@@ -88,16 +88,15 @@ async function handleLogout() {
               </button>
               <div v-if="showUserMenu" class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border py-2 z-50" style="border-color:#E8F0FE">
                 <router-link
-                  v-if="dashboardLink"
-                  :to="dashboardLink.to"
+                  to="/student-profile"
                   @click="showUserMenu=false"
                   class="block px-4 py-2.5 text-sm hover:bg-gray-50"
                   style="color:#1B3A5C"
                 >
-                  {{ dashboardLink.label }}
+                  My Profile
                 </router-link>
                 <div class="border-t my-1" style="border-color:#E8F0FE"></div>
-                <button @click="handleLogout" class="block px-4 py-2.5 text-sm hover:bg-red-50 w-full text-left" style="color:#ef4444">Sign Out</button>
+                <button @click="handleLogout" class="block px-4 py-2.5 text-sm hover:bg-red-50 w-full text-left" style="color:#ef4444">Logout</button>
               </div>
             </div>
           </template>

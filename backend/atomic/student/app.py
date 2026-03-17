@@ -109,22 +109,52 @@ class StudentById(Resource):
             return {"error": str(e)}, 500
 
     # PUT update student profile
+    # Accepts multipart/form-data with optional profileImage file upload
 
     def put(self, studentId):
-        data = request.get_json()
+        import uuid
 
-        if not data:
-            return {"error": "No input data provided"}, 400
+        form = request.form
+        file = request.files.get("profileImage")
 
-        allowed_fields = ["name", "phone", "imageURL"]
-        update_data = {k: data[k] for k in allowed_fields if k in data}
-
-        if not update_data:
-            return {"error": "No valid fields to update"}, 400
-
-        update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
+        update_data = {}
 
         try:
+            # Text fields
+            name = form.get("name")
+            phone = form.get("phone")
+
+            if name:
+                update_data["name"] = name
+
+            if phone:
+                update_data["phone"] = phone
+
+            # Image upload to Supabase Storage
+            if file and file.filename != "":
+                # Create unique file path with _student suffix to differentiate from tutors
+                file_ext = file.filename.split(".")[-1]
+                file_path = f"{studentId}_student/{uuid.uuid4()}.{file_ext}"
+
+                # Upload to Supabase Storage
+                supabase.storage.from_("tuitiongo").upload(
+                    file_path,
+                    file.read(),
+                    {"content-type": file.content_type}
+                )
+
+                # Get public URL
+                public_url = supabase.storage.from_("tuitiongo").get_public_url(file_path)
+
+                update_data["imageURL"] = public_url
+
+            if not update_data:
+                return {"error": "No valid fields to update"}, 400
+
+            # Update timestamp (UTC)
+            update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
+
+            # Update Student table
             response = (
                 supabase
                 .table("Student")
@@ -141,6 +171,10 @@ class StudentById(Resource):
         except Exception as e:
             traceback.print_exc()
             return {"error": str(e)}, 500
+
+    # PATCH update student profile (partial update)
+    def patch(self, studentId):
+        return self.put(studentId)
 
     # DELETE student account
 
