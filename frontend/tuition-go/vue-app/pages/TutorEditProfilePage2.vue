@@ -279,7 +279,7 @@ watch(activeTab, () => { saved.value = false })
             <p v-if="errors.phone" class="text-xs mt-1" style="color:#E74C3C">{{ errors.phone }}</p>
           </div>
 
-          <div>
+          <!-- <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Password</label>
             <div class="relative">
               <svg class="w-4 h-4 absolute left-4 top-1/2 -translate-y-[25%]" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -303,7 +303,7 @@ watch(activeTab, () => { saved.value = false })
               </div>
               <p class="text-xs" :style="{ color: passwordStrength.color }">{{ passwordStrength.label }}</p>
             </div>
-          </div>
+          </div> -->
 
           <div>
             <label class="text-sm font-bold block mb-2" style="color:#1B3A5C">Bio</label>
