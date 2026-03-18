@@ -61,7 +61,8 @@ const dashboardLink = computed(() => {
 })
 
 const navLinks = computed(() => {
-  const links = [{ to: '/tutors', label: 'Browse Tutors' }]
+  const links: { to: string; label: string }[] = []
+  if (isLoggedIn.value) links.push({ to: '/tutors', label: 'Browse Tutors' })
   if (dashboardLink.value) links.push(dashboardLink.value)
   return links
 })

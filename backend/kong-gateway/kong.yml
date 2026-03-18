@@ -5,6 +5,8 @@ consumers:
   - username: anonymous
 
   - username: clerk-user
+    acls:
+      - group: authenticated
     jwt_secrets:
       - key: "https://right-crow-63.clerk.accounts.dev"   # replace with your Clerk issuer URL
         algorithm: RS256
@@ -45,6 +47,12 @@ plugins:
       claims_to_verify:
         - exp
       anonymous: anonymous   # no token → anonymous consumer, passes through instead of 401
+
+  - name: acl
+    config:
+      allow:
+        - authenticated
+      hide_groups_header: true
 
 services:
   # Atomic Services
