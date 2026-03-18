@@ -139,7 +139,7 @@ const dashStats = computed(() => {
     <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-10">
         <div>
-          <h1 class="text-3xl font-extrabold" style="color:#1B3A5C">Welcome back, Alex</h1>
+          <h1 class="text-3xl font-extrabold" style="color:#1B3A5C">Welcome back, {{ user?.firstName ?? 'Student' }}</h1>
           <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Here is a summary of your learning journey</p>
         </div>
         <router-link to="/tutors" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#4A90D9">Book New Session</router-link>

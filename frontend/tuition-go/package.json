@@ -9,7 +9,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@clerk/vue": "^2.0.1",
+    "@clerk/vue": "^2.0.4",
     "@unovis/ts": "^1.6.4",
     "@unovis/vue": "^1.6.4",
     "@vee-validate/zod": "^4.15.1",

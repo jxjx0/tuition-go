@@ -18,6 +18,7 @@ import ReviewPage from './pages/ReviewPage.vue'
 import TutorEditProfilePage from './pages/TutorEditProfilePage.vue'
 import TutorEditProfilePage2 from './pages/TutorEditProfilePage2.vue'
 import AuthRedirectPage from './pages/AuthRedirectPage.vue'
+import StudentEditProfilePage from './pages/StudentEditProfilePage.vue'
 
 const routes = [
   { path: '/', name: 'home', component: LandingPage },
@@ -44,7 +45,14 @@ const routes = [
   { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
   { path: '/tutor-profile/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
   { path: '/tutor-profile2/', name: 'TutorProfile', component: TutorEditProfilePage },
+  {
+    path: '/student-profile',
+    name: 'student-profile',
+    component: StudentEditProfilePage,
+    meta: { requiresAuth: true, role: 'student' },
+  },
   { path: '/auth-redirect', name: 'auth-redirect', component: AuthRedirectPage },
+  { path: '/debug-meeting', name: 'debug-meeting', component: () => import('./pages/TestMeetingPage.vue') },
 
 ]
 

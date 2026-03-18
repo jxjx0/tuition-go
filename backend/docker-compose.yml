@@ -35,6 +35,7 @@ services:
       - "5001:5001"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+
     networks:
       - tuition-network
     restart: unless-stopped
@@ -48,6 +49,7 @@ services:
       - "5002:5002"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+
     networks:
       - tuition-network
     restart: unless-stopped
@@ -81,8 +83,13 @@ services:
       context: ./atomic/calendar
       dockerfile: Dockerfile
     container_name: calendar-service
+    environment:
+      - PYTHONUNBUFFERED=1
     ports:
       - "5005:5005"
+      - "5080:5080" #for Google
+    volumes:
+      - ./atomic/calendar:/app
     networks:
       - tuition-network
     restart: unless-stopped

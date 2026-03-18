@@ -5,7 +5,7 @@ from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from postgrest.exceptions import APIError
-from clerk_auth import require_auth
+
 
 load_dotenv()
 
@@ -72,7 +72,7 @@ class Health(Resource):
 
 @api.route('/session')
 class CreateSession(Resource):
-    @require_auth
+
     @api.expect(session_input_model)
     @api.response(201, 'Session created successfully', session_model)
     @api.response(409, 'Tutor has an overlapping session at this time.')
@@ -107,7 +107,7 @@ class CreateSession(Resource):
 
 @api.route('/session/<string:sessionId>')
 class SessionResource(Resource):
-    @require_auth
+
     @api.marshal_with(session_model)
     def get(self, sessionId):
         """Retrieve a session record."""
@@ -119,7 +119,7 @@ class SessionResource(Resource):
         except Exception as e:
             return {'message': 'Failed to retrieve session', 'error': str(e)}, 500
 
-    @require_auth
+
     @api.expect(session_update_model)
     @api.marshal_with(session_model)
     def put(self, sessionId):
@@ -133,7 +133,7 @@ class SessionResource(Resource):
         except Exception as e:
             return {'message': 'Failed to update session', 'error': str(e)}, 500
 
-    @require_auth
+
     def delete(self, sessionId):
         """Delete a session record."""
         try:
@@ -146,7 +146,7 @@ class SessionResource(Resource):
 
 @api.route('/sessions')
 class SessionList(Resource):
-    @require_auth
+
     @api.doc(params={'tutorId': 'The ID of the tutor to filter by.', 'studentId': 'The ID of the student to filter by.'})
     @api.marshal_list_with(session_model)
     def get(self):

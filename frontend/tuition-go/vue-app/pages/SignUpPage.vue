@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { SignUp, useAuth } from '@clerk/vue'
 
 const { isSignedIn } = useAuth()
 const selectedRole = ref<'student'|'tutor'>('student')
-const redirectUrl = computed(() =>
-  selectedRole.value === 'tutor' ? '/tutor-dashboard' : '/dashboard'
-)
 </script>
 
 <template>
@@ -25,7 +22,7 @@ const redirectUrl = computed(() =>
 
       <!-- Clerk SignUp -->
       <div class="flex justify-center">
-        <SignUp :unsafeMetadata="{ role: selectedRole }" :forceRedirectUrl="redirectUrl" signInFallbackRedirectUrl="/auth-redirect" />
+        <SignUp :unsafeMetadata="{ role: selectedRole }" forceRedirectUrl="/auth-redirect" signInFallbackRedirectUrl="/auth-redirect" />
       </div>
     </div>
   </div>

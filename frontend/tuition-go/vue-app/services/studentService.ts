@@ -20,8 +20,10 @@ export function useStudentService() {
       return api.get(`/students/student/by-clerk/${clerkUserId}`)
     },
 
-    update(studentId: string, payload: { name?: string; phone?: string; imageURL?: string }) {
-      return api.put(`/students/student/${studentId}`, payload)
+    update(studentId: string, formData: FormData) {
+      return api.put(`/students/student/${studentId}`, formData, {
+        headers: { 'Content-Type': undefined },
+      })
     },
 
     remove(studentId: string) {
