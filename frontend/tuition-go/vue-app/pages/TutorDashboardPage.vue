@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
 import { useMeeting } from '../composables/useMeeting'
 import { mockSessions, mockReviews } from '../composables/useMockData'
+import { findTutorById } from "../composables/useTutors"
 
 function fmtDate(d: string) { 
   return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' }) 
 }
+
 
 const { user } = useUser()
 const { loading: meetingLoading, error: meetingError, result: meetingResult, createMeeting } = useMeeting()
@@ -43,8 +45,16 @@ const showCreateSlot = ref(false)
 const showCreateMeeting = ref(false)
 const tutorId = computed(() => {
   const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
+  console.log(metadata)
   return typeof metadata?.tutorId === 'string' ? metadata.tutorId : null
 })
+const { tutor, searchForTutor, loading } = findTutorById()
+
+watch(tutorId, (id) => {
+  if (id) {
+    searchForTutor(id)
+  }
+}, { immediate: true })
 
 const tutorSessions = computed(() => {
   if (!tutorId.value) return []
@@ -59,8 +69,8 @@ const tutorReviews = computed(() => {
 const tutorStats = [
   { value: '340', label: 'Total Sessions', bg: '#E8F0FE', iconColor: '#4A90D9' },
   { value: '$22,100', label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
-  { value: '4.9', label: 'Average Rating', bg: '#E8F0FE', iconColor: '#4A90D9' },
-  { value: '127', label: 'Total Reviews', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0', label: 'Average Rating', bg: '#E8F0FE', iconColor: '#4A90D9' },
+  { value: tutor.value?.totalReviews ?? '0', label: 'Total Reviews', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
 ]
 </script>
 

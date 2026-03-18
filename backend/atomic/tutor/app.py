@@ -284,6 +284,7 @@ class TutorRegister(Resource):
             .execute()
         )
         
+        # Set in clerk unsafemetadata the tutorId to be inside it 
         if existing2.data and len(existing2.data) > 0:
             return existing2.data[0], 200
 
