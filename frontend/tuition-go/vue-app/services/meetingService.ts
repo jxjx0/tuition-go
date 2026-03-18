@@ -1,4 +1,4 @@
-import { useApi, publicApi } from './api'
+import type { AxiosInstance } from 'axios'
 
 export interface MeetingRequest {
     summary: string
@@ -20,8 +20,7 @@ export interface MeetingResponse {
  * Layer 2: Meeting Service
  * Pure functions for interacting with the meeting/calendar endpoints.
  */
-export async function createGoogleMeeting(data: MeetingRequest, googleToken?: string, userEmail?: string): Promise<MeetingResponse> {
-    const api = publicApi
+export async function createGoogleMeeting(api: AxiosInstance, data: MeetingRequest, googleToken?: string, userEmail?: string): Promise<MeetingResponse> {
     const headers: Record<string, string> = {}
     if (googleToken) {
         headers['X-Google-Token'] = googleToken

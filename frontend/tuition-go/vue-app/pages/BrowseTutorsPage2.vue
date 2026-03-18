@@ -123,7 +123,15 @@ watch([searchQuery, subjectFilter, levelFilter, sortBy], () => {
           </button>
         </div>
       </div>
-      <div v-if="filteredTutors.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-if="loading" class="text-center py-20">
+        <div class="inline-block animate-spin">
+          <svg class="w-8 h-8" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </div>
+        <p class="mt-4" style="color:#1B3A5C">Loading tutors...</p>
+      </div>
+      <div v-else-if="filteredTutors.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <router-link v-for="tutor in filteredTutors" :key="tutor.tutorId" :to="'/tutors/'+tutor.tutorId" class="group rounded-2xl border bg-white overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg flex flex-col h-full">
           <div class="p-6 flex-1">
             <div class="flex items-start gap-4">

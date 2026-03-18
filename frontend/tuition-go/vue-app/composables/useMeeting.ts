@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { createGoogleMeeting, type MeetingRequest, type MeetingResponse } from '../services/meetingService'
-import { useUser, useAuth } from '@clerk/vue'
+import { useUser } from '@clerk/vue'
+import { useApi } from '../services/api'
 
 /**
  * Layer 3: Meeting Composable
@@ -11,6 +12,7 @@ export function useMeeting() {
     const error = ref<string | null>(null)
     const result = ref<MeetingResponse | null>(null)
     const { user } = useUser()
+    const api = useApi()
 
     async function createMeeting(data: MeetingRequest) {
         loading.value = true
@@ -23,7 +25,7 @@ export function useMeeting() {
             }
 
             // We pass undefined for googleToken as it's not reliably available on frontend
-            const res = await createGoogleMeeting(data, undefined, userEmail)
+            const res = await createGoogleMeeting(api, data, undefined, userEmail)
             result.value = res
             return res
         } catch (err: any) {

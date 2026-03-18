@@ -1,15 +1,14 @@
-import { publicApi, useApi } from './api'
+import { useApi } from './api'
 
 /**
- * Tutor service — public reads use publicApi, mutations use authenticated api.
+ * Tutor service — all endpoints go through authenticated api (Kong ACL requires it).
  */
 export function useTutorService() {
   const api = useApi()
 
   return {
-    // Public endpoints — no token required, Kong allows anonymous
     search(params: { subject?: string; academicLevel?: string; name?: string; sort?: string }) {
-      return publicApi.get('/tutors/tutors/search', { params })
+      return api.get('/tutors/tutors/search', { params })
     },
 
     register(payload: { name: string; email: string; clerkUserId: string; phone?: string; password?: string }) {
@@ -17,11 +16,11 @@ export function useTutorService() {
     },
 
     getById(tutorId: string) {
-      return publicApi.get(`/tutors/tutor/${tutorId}`)
+      return api.get(`/tutors/tutor/${tutorId}`)
     },
 
     getSubjects(tutorId: string) {
-      return publicApi.get(`/tutors/tutor/${tutorId}/subjects`)
+      return api.get(`/tutors/tutor/${tutorId}/subjects`)
     },
 
     // Protected endpoints (auth required)
