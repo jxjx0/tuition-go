@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
 import { useMeeting } from '../composables/useMeeting'
-import { mockSessions, mockReviews } from '../composables/useMockData'
+import { mockReviews } from '../composables/useMockData'
 import { findTutorById } from "../composables/useTutors"
 import { useSessionService } from '../services/sessionService'
 
@@ -75,6 +75,7 @@ async function handleCreateSlot() {
     })
     slotForm.value = { tutorSubjectId: '', date: '', startTime: '', endTime: '' }
     showCreateSlot.value = false
+    if (tutorId.value) fetchSessions(tutorId.value)
   } catch (err: any) {
     slotError.value = err?.response?.data?.error || 'Failed to create session slot'
   } finally {
@@ -88,17 +89,33 @@ const tutorId = computed(() => {
 })
 const { tutor, searchForTutor, loading } = findTutorById()
 
+const sessions = ref<any[]>([])
+const sessionsLoading = ref(false)
+const sessionTab = ref<'booked' | 'available'>('booked')
+
+async function fetchSessions(id: string) {
+  sessionsLoading.value = true
+  try {
+    const { data } = await sessionService.getTutorSessions(id)
+    sessions.value = data
+  } catch (err) {
+    console.error('Failed to fetch sessions', err)
+  } finally {
+    sessionsLoading.value = false
+  }
+}
+
 watch(tutorId, (id) => {
   if (id) {
     searchForTutor(id)
+    fetchSessions(id)
   }
 }, { immediate: true })
 
-const tutorSessions = computed(() => {
-  if (!tutorId.value) return []
-  return mockSessions.filter(s => s.tutorId === tutorId.value)
-})
-const tutorUpcoming = computed(() => tutorSessions.value.filter(s => s.status === 'booked' || s.status === 'available'))
+const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'booked'))
+const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
+const displayedSessions = computed(() => sessionTab.value === 'booked' ? bookedSessions.value : availableSessions.value)
+
 const tutorReviews = computed(() => {
   if (!tutorId.value) return []
   return mockReviews.filter(r => r.tutorId === tutorId.value)
@@ -214,27 +231,45 @@ const tutorStats = [
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2">
-          <h2 class="text-lg font-bold mb-4" style="color:#1B3A5C">Upcoming Sessions</h2>
-          <div class="space-y-3">
-            <div v-for="session in tutorUpcoming" :key="session.id" class="rounded-2xl border p-5 hover:shadow-sm" style="background-color:#fff;border-color:#E8F0FE">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold" style="color:#1B3A5C">Sessions</h2>
+            <div class="flex gap-1 p-1 rounded-xl" style="background-color:#E8F0FE">
+              <button @click="sessionTab='booked'" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all" :style="sessionTab==='booked'?'background-color:#fff;color:#1B3A5C;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.5'">
+                Booked <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs" style="background-color:#4A90D9;color:#fff">{{ bookedSessions.length }}</span>
+              </button>
+              <button @click="sessionTab='available'" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all" :style="sessionTab==='available'?'background-color:#fff;color:#1B3A5C;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.5'">
+                Available <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs" style="background-color:#2EAA4F;color:#fff">{{ availableSessions.length }}</span>
+              </button>
+            </div>
+          </div>
+          <div v-if="sessionsLoading" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
+            <p class="text-sm" style="color:#1B3A5C;opacity:0.6">Loading...</p>
+          </div>
+          <div v-else class="space-y-3">
+            <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm" style="background-color:#fff;border-color:#E8F0FE">
               <div class="flex items-start gap-4">
-                <img :src="session.studentAvatar||'https://api.dicebear.com/9.x/notionists/svg?seed=Default'" :alt="session.studentName" class="w-12 h-12 rounded-xl flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color:#E8F0FE">
+                  <svg class="w-6 h-6" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                  </svg>
+                </div>
                 <div class="flex-1 min-w-0">
-                  <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
-                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">with {{ session.studentName||'Available' }}</p>
+                  <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</h3>
+                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ session.studentId ? 'Student booked' : 'No student yet' }}</p>
                   <div class="flex flex-wrap items-center gap-3 mt-2 text-xs" style="color:#1B3A5C;opacity:0.6">
-                    <span>{{ fmtDate(session.date) }}</span>
-                    <span>{{ session.startTime }} - {{ session.endTime }}</span>
+                    <span>{{ fmtDate(session.startTime) }}</span>
+                    <span>{{ new Date(session.startTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' }) }} - {{ new Date(session.endTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' }) }}</span>
+                    <span v-if="session.durationMins">{{ session.durationMins }} mins</span>
                   </div>
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0 items-end">
-                  <span class="text-sm font-bold" style="color:#2EAA4F">${{ session.price.toFixed(2) }}</span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='booked'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='booked'?'Booked':'Open' }}</span>
+                  <span v-if="session.totalPrice" class="text-sm font-bold" style="color:#2EAA4F">${{ session.totalPrice.toFixed(2) }}</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='booked'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='booked'?'Booked':'Available' }}</span>
                 </div>
               </div>
             </div>
-            <div v-if="!tutorUpcoming.length" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
-              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No upcoming sessions</p>
+            <div v-if="!displayedSessions.length" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
+              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No {{ sessionTab }} sessions</p>
             </div>
           </div>
         </div>
