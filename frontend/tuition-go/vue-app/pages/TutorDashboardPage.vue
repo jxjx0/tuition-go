@@ -5,6 +5,7 @@ import { StarRating } from '../components'
 import { useMeeting } from '../composables/useMeeting'
 import { mockSessions, mockReviews } from '../composables/useMockData'
 import { findTutorById } from "../composables/useTutors"
+import { useSessionService } from '../services/sessionService'
 
 function fmtDate(d: string) { 
   return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' }) 
@@ -43,6 +44,43 @@ async function handleCreateMeeting() {
 
 const showCreateSlot = ref(false)
 const showCreateMeeting = ref(false)
+
+const sessionService = useSessionService()
+const slotForm = ref({ tutorSubjectId: '', date: '', startTime: '', endTime: '' })
+const slotError = ref('')
+const slotCreating = ref(false)
+
+async function handleCreateSlot() {
+  slotError.value = ''
+  if (!slotForm.value.tutorSubjectId || !slotForm.value.date || !slotForm.value.startTime || !slotForm.value.endTime) {
+    slotError.value = 'Please fill in all fields'
+    return
+  }
+  const startTime = `${slotForm.value.date}T${slotForm.value.startTime}:00`
+  const endTime = `${slotForm.value.date}T${slotForm.value.endTime}:00`
+  const durationMins = (new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000
+  if (durationMins <= 0) {
+    slotError.value = 'End time must be after start time'
+    return
+  }
+  slotCreating.value = true
+  try {
+    await sessionService.createSession({
+      tutorId: tutorId.value!,
+      tutorSubjectId: slotForm.value.tutorSubjectId,
+      startTime,
+      endTime,
+      status: 'available',
+      durationMins,
+    })
+    slotForm.value = { tutorSubjectId: '', date: '', startTime: '', endTime: '' }
+    showCreateSlot.value = false
+  } catch (err: any) {
+    slotError.value = err?.response?.data?.error || 'Failed to create session slot'
+  } finally {
+    slotCreating.value = false
+  }
+}
 const tutorId = computed(() => {
   const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
   console.log(metadata)
@@ -135,7 +173,8 @@ const tutorStats = [
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Subject</label>
-            <select class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C">
+            <select v-model="slotForm.tutorSubjectId" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C">
+              <option value="" disabled>Select subject</option>
               <option v-for="s in tutor?.subjects" :key="s.tutorSubjectId" :value="s.tutorSubjectId">
                 {{ s.subject }} ({{ s.academicLevel }})
               </option>
@@ -143,19 +182,22 @@ const tutorStats = [
           </div>
           <div>
             <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Date</label>
-            <input type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+            <input v-model="slotForm.date" type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
           </div>
           <div>
             <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Time</label>
             <div class="flex items-center gap-2">
-              <input type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+              <input v-model="slotForm.startTime" type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
               <span class="text-xs" style="color:#1B3A5C;opacity:0.5">to</span>
-              <input type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+              <input v-model="slotForm.endTime" type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
             </div>
           </div>
         </div>
+        <p v-if="slotError" class="mt-3 text-xs" style="color:#E74C3C">{{ slotError }}</p>
         <div class="flex items-center gap-3 mt-4">
-          <button @click="showCreateSlot=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white" style="background-color:#2EAA4F">Create Slot</button>
+          <button @click="handleCreateSlot" :disabled="slotCreating" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style="background-color:#2EAA4F">
+            {{ slotCreating ? 'Creating...' : 'Create Slot' }}
+          </button>
           <button @click="showCreateSlot=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">Cancel</button>
         </div>
       </div>

@@ -19,5 +19,16 @@ export function useSessionService() {
     getSessionById(sessionId: string) {
       return api.get(`/getsessions/session/${sessionId}`)
     },
+
+    createSession(payload: {
+      tutorId: string
+      tutorSubjectId: string
+      startTime: string
+      endTime: string
+      status?: string
+      durationMins?: number
+    }) {
+      return api.post('/sessions/session', payload)
+    },
   }
 }
