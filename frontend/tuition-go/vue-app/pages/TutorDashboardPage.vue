@@ -136,9 +136,9 @@ const tutorStats = [
           <div>
             <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Subject</label>
             <select class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C">
-              <option>Mathematics (A-Level)</option>
-              <option>Mathematics (O-Level)</option>
-              <option>Further Mathematics (A-Level)</option>
+              <option v-for="s in tutor?.subjects" :key="s.tutorSubjectId" :value="s.tutorSubjectId">
+                {{ s.subject }} ({{ s.academicLevel }})
+              </option>
             </select>
           </div>
           <div>
