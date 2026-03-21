@@ -42,7 +42,7 @@ const routes = [
     meta: { requiresAuth: true, role: 'tutor' },
   },
   { path: '/book/:sessionId', name: 'book-session', component: BookSessionPage, props: true },
-  { path: '/session/:id', name: 'session-detail', component: SessionDetailPage, props: true, meta: { requiresAuth: true, role: 'student' } },
+  { path: '/session/:id', name: 'session-detail', component: SessionDetailPage, props: true, meta: { requiresAuth: true } },
   { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
   { path: '/tutor-profile/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
   { path: '/tutor-session/:sessionId', name: 'TutorSessionEdit', component: TutorSessionEditPage, meta: { requiresAuth: true, role: 'tutor' } },

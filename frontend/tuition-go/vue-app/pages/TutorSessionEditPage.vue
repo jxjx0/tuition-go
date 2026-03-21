@@ -80,13 +80,15 @@ async function saveSession() {
   }
   saving.value = true
   try {
-    const { data } = await sessionService.updateSession(sessionId, {
+    await sessionService.updateSession(sessionId, {
       tutorSubjectId: form.value.tutorSubjectId,
       startTime,
       endTime,
       durationMins,
     })
-    session.value = { ...session.value, ...data }
+    const { data: refreshed } = await sessionService.getSessionById(sessionId)
+    session.value = refreshed
+    populateForm(refreshed)
     isEditing.value = false
     saved.value = true
     setTimeout(() => { saved.value = false }, 3000)
@@ -122,7 +124,12 @@ async function deleteSession() {
         Back to Dashboard
       </router-link>
 
-      <div v-if="loading" class="text-center py-20 text-sm" style="color:#1B3A5C;opacity:0.5">Loading...</div>
+      <div v-if="loading" class="text-center py-20">
+        <svg class="animate-spin w-8 h-8 mx-auto" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
+      </div>
       <div v-else-if="error" class="text-center py-20 text-sm" style="color:#E74C3C">{{ error }}</div>
       <div v-else-if="!isOwner" class="text-center py-20">
         <p class="text-sm font-semibold" style="color:#E74C3C">You are not authorised to view this session.</p>
@@ -231,7 +238,11 @@ async function deleteSession() {
               <button @click="cancelEdit" class="px-5 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">
                 Cancel
               </button>
-              <button @click="saveSession" :disabled="saving" class="px-8 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50" style="background-color:#4A90D9">
+              <button @click="saveSession" :disabled="saving" class="px-8 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center gap-2" style="background-color:#4A90D9">
+                <svg v-if="saving" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
                 {{ saving ? 'Saving...' : 'Save Changes' }}
               </button>
             </div>
@@ -246,7 +257,11 @@ async function deleteSession() {
             <p class="text-sm mb-5" style="color:#1B3A5C;opacity:0.6">This action cannot be undone.</p>
             <div class="flex gap-3">
               <button @click="showDeleteConfirm = false" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">Cancel</button>
-              <button @click="deleteSession" :disabled="deleting" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50" style="background-color:#E74C3C">
+              <button @click="deleteSession" :disabled="deleting" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center justify-center gap-2" style="background-color:#E74C3C">
+                <svg v-if="deleting" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
                 {{ deleting ? 'Deleting...' : 'Delete' }}
               </button>
             </div>

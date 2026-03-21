@@ -221,7 +221,11 @@ const tutorStats = [
         </div>
         <p v-if="slotError" class="mt-3 text-xs" style="color:#E74C3C">{{ slotError }}</p>
         <div class="flex items-center gap-3 mt-4">
-          <button @click="handleCreateSlot" :disabled="slotCreating" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style="background-color:#2EAA4F">
+          <button @click="handleCreateSlot" :disabled="slotCreating" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2" style="background-color:#2EAA4F">
+            <svg v-if="slotCreating" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
             {{ slotCreating ? 'Creating...' : 'Create Slot' }}
           </button>
           <button @click="showCreateSlot=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">Cancel</button>
@@ -252,7 +256,10 @@ const tutorStats = [
             </div>
           </div>
           <div v-if="sessionsLoading" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
-            <p class="text-sm" style="color:#1B3A5C;opacity:0.6">Loading...</p>
+            <svg class="animate-spin w-6 h-6 mx-auto" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
           </div>
           <div v-else class="space-y-3">
             <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">

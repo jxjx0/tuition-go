@@ -44,13 +44,14 @@ const error = ref<string | null>(null)
 const showCancel = ref(false)
 const sessionService = useSessionService()
 
-const currentStudentId = computed(() => {
-  const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
-  return typeof metadata?.studentId === 'string' ? metadata.studentId : null
-})
+const metadata = computed(() => user.value?.unsafeMetadata as Record<string, unknown> | undefined)
+const currentStudentId = computed(() => typeof metadata.value?.studentId === 'string' ? metadata.value.studentId : null)
+const userRole = computed(() => typeof metadata.value?.role === 'string' ? metadata.value.role : null)
 
 const isOwner = computed(() =>
-  session.value?.status === 'available' || session.value?.studentId === currentStudentId.value
+  session.value?.status === 'available' ||
+  userRole.value === 'tutor' ||
+  session.value?.studentId === currentStudentId.value
 )
 
 const statusLabel = computed(() => { 
@@ -124,12 +125,10 @@ onMounted(() => {
         Back to Dashboard
       </router-link>
       <div v-if="loading" class="text-center py-20">
-        <div class="inline-block animate-spin">
-          <svg class="w-8 h-8" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-          </svg>
-        </div>
-        <p class="mt-4" style="color:#1B3A5C">Loading session details...</p>
+        <svg class="animate-spin w-8 h-8 mx-auto" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+        </svg>
       </div>
       <div v-else-if="error" class="text-center py-20">
         <h2 class="text-2xl font-bold" style="color:#ef4444">{{ error }}</h2>
@@ -178,9 +177,9 @@ onMounted(() => {
             </a>
           </div>
           <div class="flex flex-col sm:flex-row gap-3">
-            <button v-if="session.status==='available'" disabled class="flex-1 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed" style="background-color:#2EAA4F">Book Session</button>
-            <button v-if="session.status==='pending'&&!showCancel" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
-            <router-link v-if="session.status==='completed'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
+            <button v-if="session.status==='available'&&userRole!=='tutor'" disabled class="flex-1 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed" style="background-color:#2EAA4F">Book Session</button>
+            <button v-if="session.status==='pending'&&!showCancel&&userRole==='student'" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
+            <router-link v-if="session.status==='completed'&&userRole==='student'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
           </div>
           <div v-if="showCancel" class="p-5 rounded-xl border" style="border-color:#ef4444;background-color:rgba(239,68,68,0.03)">
             <p class="text-sm font-bold mb-1" style="color:#ef4444">Cancel this session?</p>
