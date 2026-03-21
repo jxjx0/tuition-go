@@ -7,8 +7,16 @@ import { mockReviews } from '../composables/useMockData'
 import { findTutorById } from "../composables/useTutors"
 import { useSessionService } from '../services/sessionService'
 
-function fmtDate(d: string) { 
-  return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' }) 
+function toUtcDate(d: string) {
+  return new Date(d + 'Z')
+}
+
+function fmtDate(d: string) {
+  return toUtcDate(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+}
+
+function fmtTime(d: string) {
+  return toUtcDate(d).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
 
@@ -97,6 +105,7 @@ async function fetchSessions(id: string) {
   sessionsLoading.value = true
   try {
     const { data } = await sessionService.getTutorSessions(id)
+    console.log('tutor sessions response:', JSON.stringify(data, null, 2))
     sessions.value = data
   } catch (err) {
     console.error('Failed to fetch sessions', err)
@@ -112,7 +121,7 @@ watch(tutorId, (id) => {
   }
 }, { immediate: true })
 
-const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'booked'))
+const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'pending'))
 const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
 const displayedSessions = computed(() => sessionTab.value === 'booked' ? bookedSessions.value : availableSessions.value)
 
@@ -246,30 +255,29 @@ const tutorStats = [
             <p class="text-sm" style="color:#1B3A5C;opacity:0.6">Loading...</p>
           </div>
           <div v-else class="space-y-3">
-            <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm" style="background-color:#fff;border-color:#E8F0FE">
+            <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color:#E8F0FE">
-                  <svg class="w-6 h-6" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                  </svg>
-                </div>
+                <img
+                  :src="session.status === 'pending' && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
+                  class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
+                />
                 <div class="flex-1 min-w-0">
                   <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</h3>
-                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ session.studentId ? 'Student booked' : 'No student yet' }}</p>
+                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ session.status === 'pending' ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
                   <div class="flex flex-wrap items-center gap-3 mt-2 text-xs" style="color:#1B3A5C;opacity:0.6">
                     <span>{{ fmtDate(session.startTime) }}</span>
-                    <span>{{ new Date(session.startTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' }) }} - {{ new Date(session.endTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' }) }}</span>
+                    <span>{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }}</span>
                     <span v-if="session.durationMins">{{ session.durationMins }} mins</span>
                   </div>
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0 items-end">
                   <span v-if="session.totalPrice" class="text-sm font-bold" style="color:#2EAA4F">${{ session.totalPrice.toFixed(2) }}</span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='booked'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='booked'?'Booked':'Available' }}</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='pending'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='pending'?'Pending':'Available' }}</span>
                 </div>
               </div>
             </div>
             <div v-if="!displayedSessions.length" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
-              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No {{ sessionTab }} sessions</p>
+              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No {{ sessionTab === 'booked' ? 'pending' : 'available' }} sessions</p>
             </div>
           </div>
         </div>

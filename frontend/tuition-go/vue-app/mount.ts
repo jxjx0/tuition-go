@@ -15,6 +15,7 @@ import TutorDetailPage2 from './pages/TutorDetailPage2.vue'
 import BookSessionPage from './pages/BookSessionPage.vue'
 import SessionDetailPage from './pages/SessionDetailPage.vue'
 import ReviewPage from './pages/ReviewPage.vue'
+import TutorSessionEditPage from './pages/TutorSessionEditPage.vue'
 import TutorEditProfilePage from './pages/TutorEditProfilePage.vue'
 import TutorEditProfilePage2 from './pages/TutorEditProfilePage2.vue'
 import AuthRedirectPage from './pages/AuthRedirectPage.vue'
@@ -44,6 +45,7 @@ const routes = [
   { path: '/session/:id', name: 'session-detail', component: SessionDetailPage, props: true },
   { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
   { path: '/tutor-profile/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
+  { path: '/tutor-session/:sessionId', name: 'TutorSessionEdit', component: TutorSessionEditPage, meta: { requiresAuth: true, role: 'tutor' } },
   { path: '/tutor-profile2/', name: 'TutorProfile', component: TutorEditProfilePage },
   {
     path: '/student-profile',
