@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { useUser } from '@clerk/vue'
 import { useSessionService } from '../services/sessionService'
 
 interface Session {
@@ -24,21 +25,33 @@ interface Session {
   notes?: string
 }
 
-function fmtDate(d: string) { 
-  return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) 
+function toUtcDate(d: string) { return new Date(d + 'Z') }
+
+function fmtDate(d: string) {
+  return toUtcDate(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
 function fmtTime(d: string) {
-  return new Date(d).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit' })
+  return toUtcDate(d).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
 const route = useRoute()
 const router = useRouter()
+const { user } = useUser()
 const session = ref<Session | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showCancel = ref(false)
 const sessionService = useSessionService()
+
+const currentStudentId = computed(() => {
+  const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
+  return typeof metadata?.studentId === 'string' ? metadata.studentId : null
+})
+
+const isOwner = computed(() =>
+  session.value?.status === 'available' || session.value?.studentId === currentStudentId.value
+)
 
 const statusLabel = computed(() => { 
   if (!session.value) return ''
@@ -122,6 +135,10 @@ onMounted(() => {
         <h2 class="text-2xl font-bold" style="color:#ef4444">{{ error }}</h2>
         <router-link to="/dashboard" class="mt-4 inline-block px-6 py-2 rounded-lg text-sm font-semibold text-white" style="background-color:#4A90D9">Back to Dashboard</router-link>
       </div>
+      <div v-else-if="!isOwner" class="text-center py-20">
+        <h2 class="text-xl font-bold" style="color:#E74C3C">You are not authorised to view this session.</h2>
+        <router-link to="/dashboard" class="mt-4 inline-block px-6 py-2 rounded-lg text-sm font-semibold text-white" style="background-color:#4A90D9">Back to Dashboard</router-link>
+      </div>
       <div v-else-if="session" class="rounded-2xl border overflow-hidden" style="background-color:#fff;border-color:#E8F0FE">
         <div class="p-6" :style="headerStyle">
           <span class="px-3 py-1 rounded-full text-xs font-bold mb-3 inline-block" style="background-color:rgba(255,255,255,0.2);color:#fff">{{ statusLabel }}</span>
@@ -161,6 +178,7 @@ onMounted(() => {
             </a>
           </div>
           <div class="flex flex-col sm:flex-row gap-3">
+            <button v-if="session.status==='available'" disabled class="flex-1 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed" style="background-color:#2EAA4F">Book Session</button>
             <button v-if="session.status==='pending'&&!showCancel" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
             <router-link v-if="session.status==='completed'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
           </div>
