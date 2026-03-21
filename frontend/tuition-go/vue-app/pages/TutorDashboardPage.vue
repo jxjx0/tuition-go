@@ -3,11 +3,20 @@ import { ref, computed, watch } from 'vue'
 import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
 import { useMeeting } from '../composables/useMeeting'
-import { mockSessions, mockReviews } from '../composables/useMockData'
+import { mockReviews } from '../composables/useMockData'
 import { findTutorById } from "../composables/useTutors"
+import { useSessionService } from '../services/sessionService'
 
-function fmtDate(d: string) { 
-  return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short' }) 
+function toUtcDate(d: string) {
+  return new Date(d + 'Z')
+}
+
+function fmtDate(d: string) {
+  return toUtcDate(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+}
+
+function fmtTime(d: string) {
+  return toUtcDate(d).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
 
@@ -43,6 +52,44 @@ async function handleCreateMeeting() {
 
 const showCreateSlot = ref(false)
 const showCreateMeeting = ref(false)
+
+const sessionService = useSessionService()
+const slotForm = ref({ tutorSubjectId: '', date: '', startTime: '', endTime: '' })
+const slotError = ref('')
+const slotCreating = ref(false)
+
+async function handleCreateSlot() {
+  slotError.value = ''
+  if (!slotForm.value.tutorSubjectId || !slotForm.value.date || !slotForm.value.startTime || !slotForm.value.endTime) {
+    slotError.value = 'Please fill in all fields'
+    return
+  }
+  const startTime = `${slotForm.value.date}T${slotForm.value.startTime}:00`
+  const endTime = `${slotForm.value.date}T${slotForm.value.endTime}:00`
+  const durationMins = (new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000
+  if (durationMins <= 0) {
+    slotError.value = 'End time must be after start time'
+    return
+  }
+  slotCreating.value = true
+  try {
+    await sessionService.createSession({
+      tutorId: tutorId.value!,
+      tutorSubjectId: slotForm.value.tutorSubjectId,
+      startTime,
+      endTime,
+      status: 'available',
+      durationMins,
+    })
+    slotForm.value = { tutorSubjectId: '', date: '', startTime: '', endTime: '' }
+    showCreateSlot.value = false
+    if (tutorId.value) fetchSessions(tutorId.value)
+  } catch (err: any) {
+    slotError.value = err?.response?.data?.error || 'Failed to create session slot'
+  } finally {
+    slotCreating.value = false
+  }
+}
 const tutorId = computed(() => {
   const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
   console.log(metadata)
@@ -50,17 +97,34 @@ const tutorId = computed(() => {
 })
 const { tutor, searchForTutor, loading } = findTutorById()
 
+const sessions = ref<any[]>([])
+const sessionsLoading = ref(false)
+const sessionTab = ref<'booked' | 'available'>('booked')
+
+async function fetchSessions(id: string) {
+  sessionsLoading.value = true
+  try {
+    const { data } = await sessionService.getTutorSessions(id)
+    console.log('tutor sessions response:', JSON.stringify(data, null, 2))
+    sessions.value = data
+  } catch (err) {
+    console.error('Failed to fetch sessions', err)
+  } finally {
+    sessionsLoading.value = false
+  }
+}
+
 watch(tutorId, (id) => {
   if (id) {
     searchForTutor(id)
+    fetchSessions(id)
   }
 }, { immediate: true })
 
-const tutorSessions = computed(() => {
-  if (!tutorId.value) return []
-  return mockSessions.filter(s => s.tutorId === tutorId.value)
-})
-const tutorUpcoming = computed(() => tutorSessions.value.filter(s => s.status === 'booked' || s.status === 'available'))
+const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'pending'))
+const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
+const displayedSessions = computed(() => sessionTab.value === 'booked' ? bookedSessions.value : availableSessions.value)
+
 const tutorReviews = computed(() => {
   if (!tutorId.value) return []
   return mockReviews.filter(r => r.tutorId === tutorId.value)
@@ -135,27 +199,35 @@ const tutorStats = [
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Subject</label>
-            <select class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C">
-              <option>Mathematics (A-Level)</option>
-              <option>Mathematics (O-Level)</option>
-              <option>Further Mathematics (A-Level)</option>
+            <select v-model="slotForm.tutorSubjectId" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C">
+              <option value="" disabled>Select subject</option>
+              <option v-for="s in tutor?.subjects" :key="s.tutorSubjectId" :value="s.tutorSubjectId">
+                {{ s.subject }} ({{ s.academicLevel }})
+              </option>
             </select>
           </div>
           <div>
             <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Date</label>
-            <input type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+            <input v-model="slotForm.date" type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
           </div>
           <div>
             <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Time</label>
             <div class="flex items-center gap-2">
-              <input type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+              <input v-model="slotForm.startTime" type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
               <span class="text-xs" style="color:#1B3A5C;opacity:0.5">to</span>
-              <input type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+              <input v-model="slotForm.endTime" type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
             </div>
           </div>
         </div>
+        <p v-if="slotError" class="mt-3 text-xs" style="color:#E74C3C">{{ slotError }}</p>
         <div class="flex items-center gap-3 mt-4">
-          <button @click="showCreateSlot=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white" style="background-color:#2EAA4F">Create Slot</button>
+          <button @click="handleCreateSlot" :disabled="slotCreating" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2" style="background-color:#2EAA4F">
+            <svg v-if="slotCreating" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+            {{ slotCreating ? 'Creating...' : 'Create Slot' }}
+          </button>
           <button @click="showCreateSlot=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">Cancel</button>
         </div>
       </div>
@@ -172,27 +244,47 @@ const tutorStats = [
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2">
-          <h2 class="text-lg font-bold mb-4" style="color:#1B3A5C">Upcoming Sessions</h2>
-          <div class="space-y-3">
-            <div v-for="session in tutorUpcoming" :key="session.id" class="rounded-2xl border p-5 hover:shadow-sm" style="background-color:#fff;border-color:#E8F0FE">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-bold" style="color:#1B3A5C">Sessions</h2>
+            <div class="flex gap-1 p-1 rounded-xl" style="background-color:#E8F0FE">
+              <button @click="sessionTab='booked'" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all" :style="sessionTab==='booked'?'background-color:#fff;color:#1B3A5C;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.5'">
+                Booked <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs" style="background-color:#4A90D9;color:#fff">{{ bookedSessions.length }}</span>
+              </button>
+              <button @click="sessionTab='available'" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all" :style="sessionTab==='available'?'background-color:#fff;color:#1B3A5C;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.5'">
+                Available <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs" style="background-color:#2EAA4F;color:#fff">{{ availableSessions.length }}</span>
+              </button>
+            </div>
+          </div>
+          <div v-if="sessionsLoading" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
+            <svg class="animate-spin w-6 h-6 mx-auto" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          </div>
+          <div v-else class="space-y-3">
+            <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
-                <img :src="session.studentAvatar||'https://api.dicebear.com/9.x/notionists/svg?seed=Default'" :alt="session.studentName" class="w-12 h-12 rounded-xl flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"/>
+                <img
+                  :src="session.status === 'pending' && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
+                  class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
+                />
                 <div class="flex-1 min-w-0">
-                  <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</h3>
-                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">with {{ session.studentName||'Available' }}</p>
+                  <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</h3>
+                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ session.status === 'pending' ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
                   <div class="flex flex-wrap items-center gap-3 mt-2 text-xs" style="color:#1B3A5C;opacity:0.6">
-                    <span>{{ fmtDate(session.date) }}</span>
-                    <span>{{ session.startTime }} - {{ session.endTime }}</span>
+                    <span>{{ fmtDate(session.startTime) }}</span>
+                    <span>{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }}</span>
+                    <span v-if="session.durationMins">{{ session.durationMins }} mins</span>
                   </div>
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0 items-end">
-                  <span class="text-sm font-bold" style="color:#2EAA4F">${{ session.price.toFixed(2) }}</span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='booked'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='booked'?'Booked':'Open' }}</span>
+                  <span v-if="session.totalPrice" class="text-sm font-bold" style="color:#2EAA4F">${{ session.totalPrice.toFixed(2) }}</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='pending'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='pending'?'Pending':'Available' }}</span>
                 </div>
               </div>
             </div>
-            <div v-if="!tutorUpcoming.length" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
-              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No upcoming sessions</p>
+            <div v-if="!displayedSessions.length" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
+              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No {{ sessionTab === 'booked' ? 'pending' : 'available' }} sessions</p>
             </div>
           </div>
         </div>
