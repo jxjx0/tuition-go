@@ -16,6 +16,7 @@ api = Api(app, doc="/docs",
 # Service URLs
 SESSION_SERVICE_URL = "http://session:5003"
 TUTOR_SERVICE_URL = "http://tutor:5002"
+STUDENT_SERVICE_URL = "http://student:5001"
 
 
 def _get_auth_headers():
@@ -42,7 +43,9 @@ enhanced_session_model = api.model('EnhancedSession', {
     'tutorImageUrl': fields.String(description='The tutor image URL'),
     'subjectName': fields.String(description='The subject name from TutorSubjects'),
     'academicLevel': fields.String(description='The academic level from TutorSubjects'),
-    'totalPrice': fields.Float(description='Total price calculated from hourly rate and duration')
+    'totalPrice': fields.Float(description='Total price calculated from hourly rate and duration'),
+    'studentName': fields.String(description='The student full name'),
+    'studentImageUrl': fields.String(description='The student image URL')
 })
 
 
@@ -127,11 +130,11 @@ class TutorSessions(Resource):
             if not sessions:
                 return [], 200
             
-            # 2. Enhance each session with tutor details and pricing
-            enhanced_sessions = _enrich_sessions(sessions)
-            
+            # 2. Enhance each session with tutor + student details and pricing
+            enhanced_sessions = _enrich_sessions_for_tutor(sessions)
+
             return enhanced_sessions, 200
-            
+
         except requests.exceptions.RequestException as e:
             print(f"Request error: {str(e)}")
             return {'message': f'Error communicating with services: {str(e)}'}, 500
@@ -168,8 +171,8 @@ class SessionDetail(Resource):
             
             session = session_response.json()
             
-            # 2. Enhance the session with tutor details and pricing
-            enhanced_sessions = _enrich_sessions([session])
+            # 2. Enhance the session with tutor, subject, pricing and student details
+            enhanced_sessions = _enrich_sessions_for_tutor([session])
             
             return enhanced_sessions[0], 200
             
@@ -265,6 +268,36 @@ def _enrich_sessions(sessions):
             enhanced_session.setdefault('totalPrice', 0.0)
             enhanced_sessions.append(enhanced_session)
     
+    return enhanced_sessions
+
+
+def _enrich_sessions_for_tutor(sessions):
+    """Enrich sessions with tutor subject details, pricing, and student details."""
+    enhanced_sessions = _enrich_sessions(sessions)
+
+    for enhanced_session in enhanced_sessions:
+        student_id = enhanced_session.get('studentId')
+        if student_id:
+            try:
+                student_response = requests.get(
+                    f"{STUDENT_SERVICE_URL}/student/{student_id}",
+                    timeout=5
+                )
+                if student_response.status_code == 200:
+                    student_data = student_response.json()
+                    enhanced_session['studentName'] = student_data.get('name', 'Unknown')
+                    enhanced_session['studentImageUrl'] = student_data.get('imageURL', None)
+                else:
+                    enhanced_session['studentName'] = 'Unknown'
+                    enhanced_session['studentImageUrl'] = None
+            except Exception as e:
+                print(f"Error fetching student {student_id}: {str(e)}")
+                enhanced_session['studentName'] = 'Unknown'
+                enhanced_session['studentImageUrl'] = None
+        else:
+            enhanced_session['studentName'] = None
+            enhanced_session['studentImageUrl'] = None
+
     return enhanced_sessions
 
 

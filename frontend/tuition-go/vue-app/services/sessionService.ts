@@ -19,5 +19,30 @@ export function useSessionService() {
     getSessionById(sessionId: string) {
       return api.get(`/getsessions/session/${sessionId}`)
     },
+
+    updateSession(sessionId: string, payload: {
+      tutorSubjectId?: string
+      startTime?: string
+      endTime?: string
+      durationMins?: number
+      meetingLink?: string
+    }) {
+      return api.put(`/sessions/session/${sessionId}`, payload)
+    },
+
+    deleteSession(sessionId: string) {
+      return api.delete(`/sessions/session/${sessionId}`)
+    },
+
+    createSession(payload: {
+      tutorId: string
+      tutorSubjectId: string
+      startTime: string
+      endTime: string
+      status?: string
+      durationMins?: number
+    }) {
+      return api.post('/sessions/session', payload)
+    },
   }
 }
