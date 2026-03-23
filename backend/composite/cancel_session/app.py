@@ -7,7 +7,8 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Cancel Session Service",
     version="1.0",
-    description="Cancel Session composite service"
+    description="Cancel Session composite service",
+    prefix="/cancel-session"
 )
 
 

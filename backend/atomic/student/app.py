@@ -19,14 +19,15 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Student Service",
     version="1.0",
-    description="Student atomic service"
+    description="Student atomic service",
+    prefix="/student"
 )
 
 
 # POST register/create student
 # Called once after Clerk sign-up to persist the student record in Supabase.
 # Frontend should then store the returned studentId in Clerk unsafeMetadata.
-@api.route("/student/register")
+@api.route("/register")
 class StudentRegister(Resource):
 
     def post(self):
@@ -86,7 +87,7 @@ class StudentRegister(Resource):
 
 
 # GET student by studentId
-@api.route("/student/<string:studentId>")
+@api.route("/<string:studentId>")
 class StudentById(Resource):
     def get(self, studentId):
         try:
@@ -200,7 +201,7 @@ class StudentById(Resource):
 
 # GET student by Clerk user ID
 # Used to look up a student record when only the Clerk session is available.
-@api.route("/student/by-clerk/<string:clerkUserId>")
+@api.route("/by-clerk/<string:clerkUserId>")
 class StudentByClerkId(Resource):
 
     def get(self, clerkUserId):
