@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
@@ -14,10 +15,10 @@ api = Api(app, doc="/docs",
     prefix="/getsessions"
 )
 
-# Service URLs
-SESSION_SERVICE_URL = "http://localhost:5003"
-TUTOR_SERVICE_URL = "http://localhost:5002"
-STUDENT_SERVICE_URL = "http://localhost:5001"
+# Service URLs - Use environment variables when running in Docker
+SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:5003")
+TUTOR_SERVICE_URL = os.environ.get("TUTOR_SERVICE_URL", "http://localhost:5002")
+STUDENT_SERVICE_URL = os.environ.get("STUDENT_SERVICE_URL", "http://localhost:5001")
 
 
 def _get_auth_headers():
