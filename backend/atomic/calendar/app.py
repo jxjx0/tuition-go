@@ -1,5 +1,9 @@
 import os
-import datetime
+# Enable insecure transport for local development (MUST be set before any oauthlib imports)
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+import json
+import pika
 import uuid
 import threading
 from flask import Flask, request, jsonify
@@ -11,11 +15,13 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from supabase import create_client, Client
+from dotenv import load_dotenv
 
 import logging
 import sys
 
-# Configure logging to output to stdout for Docker
+# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -23,9 +29,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+load_dotenv()
+supabase_url = os.environ.get("SUPABASE_URL", "")
+supabase_key = os.environ.get("SUPABASE_KEY", "")
+supabase: Client = create_client(supabase_url, supabase_key)
+
 # Global variables for background auth
 auth_thread = None
 auth_server = None
+auth_flow = None
+auth_url_cache = None
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = [
@@ -60,7 +73,77 @@ class AuthRequiredException(Exception):
     def __init__(self, auth_url):
         self.auth_url = auth_url
 
-def get_calendar_service(access_token=None, interactive=False):
+def run_interactive_auth(flow):
+    """Wait for the user to complete auth on port 5080."""
+    class RobustRedirectWSGIApp:
+        def __init__(self, message, flow):
+            self.message = message
+            self.flow = flow
+            self.done = False
+
+        def __call__(self, environ, start_response):
+            path = environ.get('PATH_INFO', '')
+            query = environ.get('QUERY_STRING', '')
+            logger.info(f"Callback Server: Received request {path}")
+            
+            if 'favicon.ico' in path:
+                start_response('204 No Content', [('Content-Type', 'text/plain')])
+                return [b'']
+                
+            if 'code=' in query or 'error=' in query:
+                host = environ.get('HTTP_HOST', 'localhost:5080')
+                authorization_response = f"http://{host}{path}?{query}"
+                # Re-fix the URI if it needs https
+                if 'localhost' not in host:
+                    authorization_response = authorization_response.replace('http://', 'https://')
+                
+                logger.info(f"Callback Server: Auth code detected! Exchanging token...")
+                try:
+                    self.flow.fetch_token(authorization_response=authorization_response)
+                    creds = self.flow.credentials
+                    
+                    logger.info(f"Token obtained! Saving to {TOKEN_PATH}...")
+                    with open(TOKEN_PATH, "w") as token_file:
+                        token_file.write(creds.to_json())
+                    logger.info("Token saved successfully!")
+                    
+                    self.message = "Success! Your authentication token has been saved. You may now close this tab and return to the application."
+                    self.done = True
+                except Exception as e:
+                    logger.error(f"Error during token exchange: {e}")
+                    self.message = f"Error during authentication: {str(e)}. Please check container logs."
+                    self.done = True # Stop even on error
+
+            start_response('200 OK', [('Content-Type', 'text/html')])
+            response_body = f"<html><body style='font-family: sans-serif; padding: 20px;'><h2>{self.message}</h2><p>You can close this tab if the message says Success.</p></body></html>"
+            return [response_body.encode('utf-8')]
+
+    wsgi_app = RobustRedirectWSGIApp("Authentication process started... exchanging code for token...", flow)
+    global auth_server
+    from google_auth_oauthlib.flow import _WSGIRequestHandler
+    import wsgiref.simple_server
+    
+    try:
+        auth_server = wsgiref.simple_server.make_server(
+            '0.0.0.0', 5080, wsgi_app, handler_class=_WSGIRequestHandler)
+        
+        logger.info("Auth listener started on 0.0.0.0:5080. Waiting for OAuth code...")
+        while not wsgi_app.done:
+            auth_server.handle_request()
+            
+        logger.info("Interactive auth complete. Shutting down listener.")
+
+    except Exception as e:
+        logger.error(f"Error in auth listener loop: {e}")
+    finally:
+        global auth_flow, auth_url_cache
+        auth_flow = None
+        auth_url_cache = None
+        if auth_server:
+            auth_server.server_close()
+            auth_server = None
+
+def get_calendar_service(access_token=None):
     creds = None
     
     # If a direct access token is provided (pass-through from Clerk), use it
@@ -89,53 +172,157 @@ def get_calendar_service(access_token=None, interactive=False):
             if not os.path.exists(CREDENTIALS_PATH):
                 raise Exception(f"credentials.json not found at {CREDENTIALS_PATH}")
             
-            # Enable insecure transport for local development (http instead of https)
-            os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+            # Use globals to sync between /auth-url and background thread
+            global auth_flow, auth_url_cache
+            if not auth_flow:
+                auth_flow = InstalledAppFlow.from_client_secrets_file(
+                    CREDENTIALS_PATH, SCOPES
+                )
+                auth_flow.redirect_uri = 'http://localhost:5080'
+                auth_url_cache, _ = auth_flow.authorization_url(prompt='consent', access_type='offline')
             
-            flow = InstalledAppFlow.from_client_secrets_file(
-                CREDENTIALS_PATH, SCOPES
-            )
-            flow.redirect_uri = 'http://localhost:5080'
-            auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
-            
-            if not interactive:
-                # In non-interactive mode (API calls), we just return the URL via exception
-                raise AuthRequiredException(auth_url)
-            
-            # Interactive mode (blocking WSGI server, usually in a background thread)
-            from google_auth_oauthlib.flow import _WSGIRequestHandler, _RedirectWSGIApp
-            import wsgiref.simple_server
-            
-            wsgi_app = _RedirectWSGIApp("Success! You have authenticated. You can close this tab.")
-            global auth_server
-            try:
-                auth_server = wsgiref.simple_server.make_server(
-                    '0.0.0.0', 5080, wsgi_app, handler_class=_WSGIRequestHandler)
-                
-                logger.info(f"Auth listener started on 0.0.0.0:5080. AUTH URL: {auth_url}")
-                while wsgi_app.last_request_uri is None:
-                    auth_server.handle_request()
-                
-                logger.info("Callback received! Finalizing token...")
-                authorization_response = wsgi_app.last_request_uri.replace('http://', 'https://')
-                flow.fetch_token(authorization_response=authorization_response)
-                creds = flow.credentials
-                
-                with open(TOKEN_PATH, "w") as token:
-                    token.write(creds.to_json())
-            except Exception as e:
-                logger.error(f"Error in auth listener: {e}")
-                import traceback
-                logger.error(traceback.format_exc())
-            finally:
-                if auth_server:
-                    logger.info("Closing auth listener server...")
-                    auth_server.server_close()
-                    auth_server = None
+            # Non-interactive mode (API calls), we just return the URL via exception
+            raise AuthRequiredException(auth_url_cache)
 
     return build("calendar", "v3", credentials=creds)
 
-    return build("calendar", "v3", credentials=creds)
+# ==================== RabbitMQ Worker ====================
+RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+
+def handle_session_created(session_data):
+    """Creates a Google Meeting for a new session slot."""
+    logger.info(f"Worker: Handling session.created for {session_data.get('sessionId')}")
+    service = get_calendar_service()
+    if not service:
+        logger.error("Worker: Could not get calendar service (unauthorized?)")
+        return
+
+    try:
+        # Google Meet link generation
+        event_body = {
+            'summary': f"Tutor Session (Pending)",
+            'description': 'Generated automatically by TuitionGo.',
+            'start': {'dateTime': session_data['startTime'] + 'Z', 'timeZone': 'UTC'},
+            'end': {'dateTime': session_data['endTime'] + 'Z', 'timeZone': 'UTC'},
+            'conferenceData': {
+                'createRequest': {
+                    'requestId': f"req-{session_data['sessionId']}",
+                    'conferenceSolutionKey': {'type': 'hangoutsMeet'}
+                }
+            }
+        }
+        
+        event = service.events().insert(
+            calendarId='primary',
+            body=event_body,
+            conferenceDataVersion=1
+        ).execute()
+        
+        meeting_link = event.get('hangoutLink')
+        
+        # Update Supabase
+        supabase.table('Session').update({
+            'meetingLink': meeting_link,
+        }).eq('sessionId', session_data['sessionId']).execute()
+        
+        logger.info(f"Worker: Successfully created meeting {meeting_link}")
+    except Exception as e:
+        logger.error(f"Worker error in session.created: {e}")
+
+def handle_session_booked(session_data):
+    """Updates the existing meeting with student details."""
+    logger.info(f"Worker: Handling session.booked for {session_data.get('sessionId')}")
+    service = get_calendar_service()
+    if not service:
+        return
+
+    try:
+        # We need the Google Event ID. If we don't have it in the DB yet,
+        # we might have to search for it, or we should have stored it.
+        # For now, let's assume meetingLink is used or we search by summary/time.
+        # IMPROVEMENT: If we had eventId, we'd use service.events().get(...)
+        
+        # Searching for the event by start time and summary (fragile but works for demo)
+        start_time = session_data['startTime'] + 'Z'
+        events_result = service.events().list(
+            calendarId='primary', 
+            timeMin=start_time,
+            maxResults=10, 
+            singleEvents=True
+        ).execute()
+        events = events_result.get('items', [])
+        
+        target_event = None
+        for event in events:
+            if event.get('start', {}).get('dateTime') == start_time:
+                target_event = event
+                break
+        
+        if target_event:
+            # Update event: Set summary to Booked and add attendee
+            target_event['summary'] = f"Tutor Session (Booked)"
+            attendees = target_event.get('attendees', [])
+            if session_data.get('studentEmail'):
+                attendees.append({'email': session_data['studentEmail']})
+                target_event['attendees'] = attendees
+            
+            service.events().update(
+                calendarId='primary',
+                eventId=target_event['id'],
+                body=target_event,
+                sendUpdates='all'
+            ).execute()
+            logger.info(f"Worker: Successfully updated event {target_event['id']} for booking.")
+        else:
+            logger.warning(f"Worker: Could not find event to update for session {session_data.get('sessionId')}")
+            
+    except Exception as e:
+        logger.error(f"Worker error in session.booked: {e}")
+
+def start_event_worker():
+    """Starts the RabbitMQ consumer loop with retry logic."""
+    import time
+    max_retries = 10
+    retry_delay = 5
+    
+    for attempt in range(max_retries):
+        try:
+            params = pika.URLParameters(RABBITMQ_URL)
+            connection = pika.BlockingConnection(params)
+            channel = connection.channel()
+            
+            channel.exchange_declare(exchange='session_events', exchange_type='topic', durable=True)
+            result = channel.queue_declare(queue='calendar_updates', durable=True)
+            queue_name = result.method.queue
+            
+            channel.queue_bind(exchange='session_events', queue=queue_name, routing_key='session.*')
+            
+            def callback(ch, method, properties, body):
+                try:
+                    data = json.loads(body)
+                    routing_key = method.routing_key
+                    if routing_key == 'session.created':
+                        handle_session_created(data)
+                    elif routing_key == 'session.booked':
+                        handle_session_booked(data)
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                except Exception as cb_err:
+                    logger.error(f"Worker callback error: {cb_err}")
+
+            channel.basic_consume(queue=queue_name, on_message_callback=callback)
+            logger.info(" [*] Calendar worker started. Waiting for messages...")
+            channel.start_consuming()
+            break # Success, exit retry loop
+        except Exception as e:
+            logger.warning(f"Worker connection attempt {attempt+1}/{max_retries} failed: {e}. Retrying in {retry_delay}s...")
+            time.sleep(retry_delay)
+    else:
+        logger.error("Worker failed to connect after multiple retries. background work disabled.")
+
+# Start worker thread on app load
+worker_thread = threading.Thread(target=start_event_worker)
+worker_thread.daemon = True
+worker_thread.start()
 
 @api.route("/health")
 class Health(Resource):
@@ -157,21 +344,26 @@ class AuthUrl(Resource):
             return {"message": "Already authenticated", "authenticated": True}, 200
             
         try:
-            # Get the URL without blocking
-            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
-            flow.redirect_uri = 'http://localhost:5080'
-            auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
-            
-            # Start the blocking listener in a background thread if not already running
-            global auth_thread
-            if auth_thread is None or not auth_thread.is_alive():
-                logger.info("Starting background auth listener on port 5080...")
-                auth_thread = threading.Thread(target=lambda: get_calendar_service(interactive=True))
-                auth_thread.daemon = True
-                auth_thread.start()
+            # Use get_calendar_service to trigger AuthRequiredException if needed
+            # which will use/create the global auth_flow
+            try:
+                get_calendar_service()
+                return {"message": "Already authenticated", "authenticated": True}, 200
+            except AuthRequiredException as auth_err:
+                auth_url = auth_err.auth_url
                 
-            return {"authUrl": auth_url, "authenticated": False}, 200
+                # Start the blocking listener in a background thread if not already running
+                global auth_thread, auth_flow
+                if auth_thread is None or not auth_thread.is_alive():
+                    logger.info("Starting background auth listener on port 5080...")
+                    # auth_flow was just created inside get_calendar_service
+                    auth_thread = threading.Thread(target=lambda: run_interactive_auth(auth_flow))
+                    auth_thread.daemon = True
+                    auth_thread.start()
+                    
+                return {"authUrl": auth_url, "authenticated": False}, 200
         except Exception as e:
+            logger.error(f"Error in /auth-url: {e}")
             return {"error": str(e)}, 500
 
 @api.route("/create-meeting")

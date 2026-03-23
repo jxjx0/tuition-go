@@ -41,6 +41,7 @@ services:
     routes:
       - name: student-route
         paths: [/api/v1/students]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: tutor-service
@@ -53,6 +54,7 @@ services:
     routes:
       - name: tutor-route
         paths: [/api/v1/tutors]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: session-service
@@ -65,6 +67,7 @@ services:
     routes:
       - name: session-route
         paths: [/api/v1/sessions]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: meeting-service
@@ -77,6 +80,7 @@ services:
     routes:
       - name: meeting-route
         paths: [/api/v1/meetings]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: calendar-service
@@ -84,13 +88,13 @@ services:
     routes:
       - name: calendar-public-route
         paths: [/api/v1/calendar]
-        methods: [GET]
+        methods: [GET, OPTIONS]
         strip_path: true
         # No security on GET (auth-status, auth-url, health)
         
       - name: calendar-protected-route
         paths: [/api/v1/calendar]
-        methods: [POST, PUT, DELETE, PATCH]
+        methods: [POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
         plugins:
           - name: jwt
@@ -103,6 +107,7 @@ services:
     routes:
       - name: email-route
         paths: [/api/v1/emails]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: payment-service
@@ -110,6 +115,7 @@ services:
     routes:
       - name: payment-route
         paths: [/api/v1/payments]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: book-session-service
@@ -117,6 +123,7 @@ services:
     routes:
       - name: book-session-route
         paths: [/api/v1/book-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: cancel-session-service
@@ -124,6 +131,7 @@ services:
     routes:
       - name: cancel-session-route
         paths: [/api/v1/cancel-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: rate-tutor-service
@@ -131,6 +139,7 @@ services:
     routes:
       - name: rate-tutor-route
         paths: [/api/v1/rate-tutor]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: get-sessions-service
@@ -138,4 +147,5 @@ services:
     routes:
       - name: get-sessions-route
         paths: [/api/v1/getsessions/]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
