@@ -7,7 +7,8 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Email Service",
     version="1.0",
-    description="Email atomic service"
+    description="Email atomic service",
+    prefix="/email"
 )
 
 

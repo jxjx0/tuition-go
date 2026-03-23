@@ -7,7 +7,8 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Payment Service",
     version="1.0",
-    description="Payment atomic service"
+    description="Payment atomic service",
+    prefix="/payment"
 )
 
 

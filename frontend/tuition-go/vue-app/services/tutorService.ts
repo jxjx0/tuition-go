@@ -8,34 +8,34 @@ export function useTutorService() {
 
   return {
     search(params: { subject?: string; academicLevel?: string; name?: string; sort?: string }) {
-      return api.get('/tutors/tutors/search', { params })
+      return api.get('/tutors/search', { params })
     },
 
     register(payload: { name: string; email: string; clerkUserId: string; phone?: string; password?: string }) {
-      return api.post('/tutors/tutor/register', payload)
+      return api.post('/tutors/register', payload)
     },
 
     getById(tutorId: string) {
-      return api.get(`/tutors/tutor/${tutorId}`)
+      return api.get(`/tutors/${tutorId}`)
     },
 
     getSubjects(tutorId: string) {
-      return api.get(`/tutors/tutor/${tutorId}/subjects`)
+      return api.get(`/tutors/${tutorId}/subjects`)
     },
 
     // Protected endpoints (auth required)
     updateProfile(tutorId: string, formData: FormData) {
-      return api.put(`/tutors/tutor/${tutorId}`, formData, {
+      return api.put(`/tutors/${tutorId}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
     },
 
     addSubject(tutorId: string, data: { subject: string; academicLevel: string; hourlyRate: number }) {
-      return api.post(`/tutors/tutor/${tutorId}/subjects`, data)
+      return api.post(`/tutors/${tutorId}/subjects`, data)
     },
 
     deleteSubject(tutorId: string, subjectId: string) {
-      return api.delete(`/tutors/tutor/${tutorId}/subjects/${subjectId}`)
+      return api.delete(`/tutors/${tutorId}/subjects/${subjectId}`)
     },
   }
 }

@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
@@ -10,13 +11,14 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Get Sessions Service",
     version="1.0",
-    description="Composite service to retrieve sessions (by student or tutor) and enrich with tutor details and pricing"
+    description="Composite service to retrieve sessions (by student or tutor) and enrich with tutor details and pricing",
+    prefix="/getsessions"
 )
 
-# Service URLs
-SESSION_SERVICE_URL = "http://session:5003"
-TUTOR_SERVICE_URL = "http://tutor:5002"
-STUDENT_SERVICE_URL = "http://student:5001"
+# Service URLs - Use environment variables when running in Docker
+SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:5003")
+TUTOR_SERVICE_URL = os.environ.get("TUTOR_SERVICE_URL", "http://localhost:5002")
+STUDENT_SERVICE_URL = os.environ.get("STUDENT_SERVICE_URL", "http://localhost:5001")
 
 
 def _get_auth_headers():
@@ -68,7 +70,7 @@ class StudentSessions(Resource):
             # 1. Get all sessions for the student
             auth_headers = _get_auth_headers()
             sessions_response = requests.get(
-                f"{SESSION_SERVICE_URL}/sessions",
+                f"{SESSION_SERVICE_URL}/session/all",
                 params={"studentId": studentId},
                 headers=auth_headers,
                 timeout=5
@@ -113,7 +115,7 @@ class TutorSessions(Resource):
             # 1. Get all sessions for the tutor
             auth_headers = _get_auth_headers()
             sessions_response = requests.get(
-                f"{SESSION_SERVICE_URL}/sessions",
+                f"{SESSION_SERVICE_URL}/session/all",
                 params={"tutorId": tutorId},
                 headers=auth_headers,
                 timeout=5

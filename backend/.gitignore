@@ -8,3 +8,7 @@ __pycache__/
 
 #ignore python virtual env
 venv
+
+# Google API
+token.json
+credentials.json
