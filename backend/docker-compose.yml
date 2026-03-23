@@ -24,7 +24,19 @@ services:
       - rate-tutor
       - get-sessions
     restart: unless-stopped
-
+  # ==================== RABBITMQ SERVICES ====================
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"     # AMQP (your services use this)
+      - "15672:15672"   # Web UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - tuition-network
+    restart: unless-stopped
   # ==================== ATOMIC SERVICES ====================
   student:
     build:
@@ -166,3 +178,7 @@ services:
 networks:
   tuition-network:
     driver: bridge
+
+volumes:
+  rabbitmq_data:
+    name: tuitiongo_rabbitmq_data
