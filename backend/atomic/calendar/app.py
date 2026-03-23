@@ -112,7 +112,7 @@ def get_calendar_service(access_token=None, interactive=False):
                 auth_server = wsgiref.simple_server.make_server(
                     '0.0.0.0', 5080, wsgi_app, handler_class=_WSGIRequestHandler)
                 
-                logger.info(f"Auth listener started. AUTH URL: {auth_url}")
+                logger.info(f"Auth listener started on 0.0.0.0:5080. AUTH URL: {auth_url}")
                 while wsgi_app.last_request_uri is None:
                     auth_server.handle_request()
                 
@@ -123,8 +123,13 @@ def get_calendar_service(access_token=None, interactive=False):
                 
                 with open(TOKEN_PATH, "w") as token:
                     token.write(creds.to_json())
+            except Exception as e:
+                logger.error(f"Error in auth listener: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
             finally:
                 if auth_server:
+                    logger.info("Closing auth listener server...")
                     auth_server.server_close()
                     auth_server = None
 
