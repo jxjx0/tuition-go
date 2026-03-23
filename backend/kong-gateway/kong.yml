@@ -59,7 +59,7 @@ plugins:
 services:
   # Atomic Services
   - name: student-service
-    url: http://student:5001
+    url: http://student:5001/student
     routes:
       - name: student-route
         paths:
@@ -67,7 +67,7 @@ services:
         strip_path: true
 
   - name: tutor-service
-    url: http://tutor:5002
+    url: http://tutor:5002/tutor
     routes:
       - name: tutor-route
         paths:
@@ -75,7 +75,7 @@ services:
         strip_path: true
 
   - name: session-service
-    url: http://session:5003
+    url: http://session:5003/session
     routes:
       - name: session-route
         paths:
@@ -83,7 +83,7 @@ services:
         strip_path: true
 
   - name: meeting-service
-    url: http://meeting:5004
+    url: http://meeting:5004/meeting
     routes:
       - name: meeting-route
         paths:
@@ -91,7 +91,7 @@ services:
         strip_path: true
 
   - name: calendar-service
-    url: http://calendar:5005
+    url: http://calendar:5005/calendar
     routes:
       - name: calendar-route
         paths:
@@ -99,7 +99,7 @@ services:
         strip_path: true
 
   - name: email-service
-    url: http://email:5006
+    url: http://email:5006/email
     routes:
       - name: email-route
         paths:
@@ -107,7 +107,7 @@ services:
         strip_path: true
 
   - name: payment-service
-    url: http://payment:5007
+    url: http://payment:5007/payment
     routes:
       - name: payment-route
         paths:
@@ -116,7 +116,7 @@ services:
 
   # Composite Services
   - name: book-session-service
-    url: http://book-session:5100
+    url: http://book-session:5100/book-session
     routes:
       - name: book-session-route
         paths:
@@ -124,7 +124,7 @@ services:
         strip_path: true
 
   - name: cancel-session-service
-    url: http://cancel-session:5101
+    url: http://cancel-session:5101/cancel-session
     routes:
       - name: cancel-session-route
         paths:
@@ -132,7 +132,7 @@ services:
         strip_path: true
 
   - name: rate-tutor-service
-    url: http://rate-tutor:5102
+    url: http://rate-tutor:5102/rate-tutor
     routes:
       - name: rate-tutor-route
         paths:
@@ -140,7 +140,7 @@ services:
         strip_path: true
 
   - name: get-sessions-service
-    url: http://get-sessions:5103
+    url: http://get-sessions:5103/getsessions
     routes:
       - name: get-sessions-route
         paths:

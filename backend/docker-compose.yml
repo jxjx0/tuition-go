@@ -35,6 +35,8 @@ services:
       - "5001:5001"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
 
     networks:
       - tuition-network
@@ -49,6 +51,8 @@ services:
       - "5002:5002"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
 
     networks:
       - tuition-network
@@ -63,6 +67,8 @@ services:
       - "5003:5003"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
     networks:
       - tuition-network
     restart: unless-stopped
@@ -85,6 +91,8 @@ services:
     container_name: calendar-service
     environment:
       - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
     ports:
       - "5005:5005"
       - "5080:5080" #for Google
@@ -159,6 +167,9 @@ services:
       - "5103:5103"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - STUDENT_SERVICE_URL=http://student:5001
     networks:
       - tuition-network
     restart: unless-stopped

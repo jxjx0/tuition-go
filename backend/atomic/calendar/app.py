@@ -1,7 +1,8 @@
 import os
 import datetime
 import uuid
-from flask import Flask, request
+import threading
+from flask import Flask, request, jsonify
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 
@@ -21,6 +22,10 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
+
+# Global variables for background auth
+auth_thread = None
+auth_server = None
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = [
@@ -51,7 +56,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
 TOKEN_PATH = os.path.join(BASE_DIR, "token.json")
 
-def get_calendar_service(access_token=None):
+class AuthRequiredException(Exception):
+    def __init__(self, auth_url):
+        self.auth_url = auth_url
+
+def get_calendar_service(access_token=None, interactive=False):
     creds = None
     
     # If a direct access token is provided (pass-through from Clerk), use it
@@ -61,7 +70,6 @@ def get_calendar_service(access_token=None):
     
     # Otherwise check for local token.json
     if not creds:
-        logger.info(f"Checking for token at {TOKEN_PATH}")
         if os.path.exists(TOKEN_PATH):
             logger.info("Token found. Loading credentials...")
             creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
@@ -69,10 +77,15 @@ def get_calendar_service(access_token=None):
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             logger.info("Token expired. Refreshing...")
-            creds.refresh(Request())
-        else:
-            logger.info("No valid credentials. Starting OAuth flow...")
-            # ... (rest of the OAuth flow code)
+            try:
+                creds.refresh(Request())
+                with open(TOKEN_PATH, "w") as token:
+                    token.write(creds.to_json())
+            except Exception as e:
+                logger.error(f"Refresh failed: {e}")
+                creds = None
+        
+        if not creds:
             if not os.path.exists(CREDENTIALS_PATH):
                 raise Exception(f"credentials.json not found at {CREDENTIALS_PATH}")
             
@@ -82,56 +95,40 @@ def get_calendar_service(access_token=None):
             flow = InstalledAppFlow.from_client_secrets_file(
                 CREDENTIALS_PATH, SCOPES
             )
-            
-            # Use localhost to match credentials.json redirect_uris
             flow.redirect_uri = 'http://localhost:5080'
             auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
             
-            logger.info("=" * 60)
-            logger.info("AUTHENTICATION REQUIRED - ACTION NEEDED")
-            logger.info("1. Visit the URL below in your browser.")
-            logger.info("2. Sign in with the Google account you want to use for meetings.")
-            logger.info("3. If you get a 'Google hasn't verified this app' warning, click 'Advanced' then 'Go to ... (unsafe)'.")
-            logger.info("IMPORTANT: If you get an 'Access blocked: project has not been configured' error,")
-            logger.info("ensure your email is added as a 'Test user' in the Google Cloud Console.")
-            logger.info(f"AUTH URL: {auth_url}")
-            logger.info("=" * 60)
+            if not interactive:
+                # In non-interactive mode (API calls), we just return the URL via exception
+                raise AuthRequiredException(auth_url)
             
+            # Interactive mode (blocking WSGI server, usually in a background thread)
             from google_auth_oauthlib.flow import _WSGIRequestHandler, _RedirectWSGIApp
             import wsgiref.simple_server
             
             wsgi_app = _RedirectWSGIApp("Success! You have authenticated. You can close this tab.")
+            global auth_server
             try:
-                local_server = wsgiref.simple_server.make_server(
+                auth_server = wsgiref.simple_server.make_server(
                     '0.0.0.0', 5080, wsgi_app, handler_class=_WSGIRequestHandler)
-            except OSError as e:
-                if e.errno == 98:
-                    logger.error("Port 5080 is already in use. Another authentication process may be running.")
-                    raise Exception("Authentication port 5080 is busy. Please wait a moment and try again.")
-                raise e
-            
-            logger.info("Waiting for your browser to redirect to port 5080...")
-            
-            # Robust loop: keep handling requests until we actually get the callback
-            # This prevents crashing on background requests like favicon.ico
-            while wsgi_app.last_request_uri is None:
-                local_server.handle_request()
-            
-            logger.info("Callback received! Finalizing token...")
-            
-            # Fetch the token. We replace http with https for the library's internal check.
-            try:
+                
+                logger.info(f"Auth listener started. AUTH URL: {auth_url}")
+                while wsgi_app.last_request_uri is None:
+                    auth_server.handle_request()
+                
+                logger.info("Callback received! Finalizing token...")
                 authorization_response = wsgi_app.last_request_uri.replace('http://', 'https://')
                 flow.fetch_token(authorization_response=authorization_response)
                 creds = flow.credentials
-            except Exception as token_err:
-                logger.error(f"Failed to fetch token: {token_err}")
-                logger.error(f"Check if the redirect URL in Google Cloud exactly matches http://localhost:5080")
-                raise token_err
-        
-        logger.info(f"Saving new token to {TOKEN_PATH}")
-        with open(TOKEN_PATH, "w") as token:
-            token.write(creds.to_json())
+                
+                with open(TOKEN_PATH, "w") as token:
+                    token.write(creds.to_json())
+            finally:
+                if auth_server:
+                    auth_server.server_close()
+                    auth_server = None
+
+    return build("calendar", "v3", credentials=creds)
 
     return build("calendar", "v3", credentials=creds)
 
@@ -139,6 +136,38 @@ def get_calendar_service(access_token=None):
 class Health(Resource):
     def get(self):
         return {"status": "healthy", "service": "calendar"}, 200
+
+@api.route("/auth-status")
+class AuthStatus(Resource):
+    def get(self):
+        """Checks if the service is authenticated with Google."""
+        authenticated = os.path.exists(TOKEN_PATH)
+        return {"authenticated": authenticated}, 200
+
+@api.route("/auth-url")
+class AuthUrl(Resource):
+    def get(self):
+        """Returns the Google Authorization URL and starts the listener in background."""
+        if os.path.exists(TOKEN_PATH):
+            return {"message": "Already authenticated", "authenticated": True}, 200
+            
+        try:
+            # Get the URL without blocking
+            flow = InstalledAppFlow.from_client_secrets_file(CREDENTIALS_PATH, SCOPES)
+            flow.redirect_uri = 'http://localhost:5080'
+            auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
+            
+            # Start the blocking listener in a background thread if not already running
+            global auth_thread
+            if auth_thread is None or not auth_thread.is_alive():
+                logger.info("Starting background auth listener on port 5080...")
+                auth_thread = threading.Thread(target=lambda: get_calendar_service(interactive=True))
+                auth_thread.daemon = True
+                auth_thread.start()
+                
+            return {"authUrl": auth_url, "authenticated": False}, 200
+        except Exception as e:
+            return {"error": str(e)}, 500
 
 @api.route("/create-meeting")
 class CreateMeeting(Resource):
@@ -163,7 +192,15 @@ class CreateMeeting(Resource):
 
         try:
             logger.info(f"Fetching calendar service (token from header: {bool(access_token)})...")
-            service = get_calendar_service(access_token=access_token)
+            try:
+                service = get_calendar_service(access_token=access_token)
+            except AuthRequiredException as auth_err:
+                # Return 401 and the URL so frontend can show a button
+                return {
+                    "error": "Authentication required",
+                    "authUrl": auth_err.auth_url
+                }, 401
+            
             logger.info("Service obtained. Fetching traveler identity...")
             
             # Build attendees list
