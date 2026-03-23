@@ -27,11 +27,11 @@ export function useSessionService() {
       durationMins?: number
       meetingLink?: string
     }) {
-      return api.put(`/sessions/session/${sessionId}`, payload)
+      return api.put(`/sessions/${sessionId}`, payload)
     },
 
     deleteSession(sessionId: string) {
-      return api.delete(`/sessions/session/${sessionId}`)
+      return api.delete(`/sessions/${sessionId}`)
     },
 
     createSession(payload: {
@@ -42,7 +42,7 @@ export function useSessionService() {
       status?: string
       durationMins?: number
     }) {
-      return api.post('/sessions/session', payload)
+      return api.post('/sessions', payload)
     },
   }
 }

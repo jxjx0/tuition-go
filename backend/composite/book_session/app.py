@@ -7,7 +7,8 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Book Session Service",
     version="1.0",
-    description="Book Session composite service"
+    description="Book Session composite service",
+    prefix="/book-session"
 )
 
 

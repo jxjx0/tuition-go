@@ -33,7 +33,8 @@ CORS(app, resources={r"/*": {"origins": "*", "allow_headers": ["Content-Type", "
 api = Api(app, doc="/docs",
     title="Calendar Service",
     version="1.0",
-    description="Calendar atomic service"
+    description="Calendar atomic service",
+    prefix="/calendar"
 )
 
 meeting_model = api.model('MeetingRequest', {
@@ -82,15 +83,19 @@ def get_calendar_service(access_token=None):
                 CREDENTIALS_PATH, SCOPES
             )
             
-            # Use 127.0.0.1 instead of localhost (Google prefers IPs for local secure flows now)
-            # Remove trailing slash to match some strict redirect URI policies
-            flow.redirect_uri = 'http://127.0.0.1:5080'
+            # Use localhost to match credentials.json redirect_uris
+            flow.redirect_uri = 'http://localhost:5080'
             auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
             
-            logger.info("=" * 50)
-            logger.info("AUTHENTICATION REQUIRED")
-            logger.info(f"Please visit this URL: {auth_url}")
-            logger.info("=" * 50)
+            logger.info("=" * 60)
+            logger.info("AUTHENTICATION REQUIRED - ACTION NEEDED")
+            logger.info("1. Visit the URL below in your browser.")
+            logger.info("2. Sign in with the Google account you want to use for meetings.")
+            logger.info("3. If you get a 'Google hasn't verified this app' warning, click 'Advanced' then 'Go to ... (unsafe)'.")
+            logger.info("IMPORTANT: If you get an 'Access blocked: project has not been configured' error,")
+            logger.info("ensure your email is added as a 'Test user' in the Google Cloud Console.")
+            logger.info(f"AUTH URL: {auth_url}")
+            logger.info("=" * 60)
             
             from google_auth_oauthlib.flow import _WSGIRequestHandler, _RedirectWSGIApp
             import wsgiref.simple_server
@@ -115,9 +120,14 @@ def get_calendar_service(access_token=None):
             logger.info("Callback received! Finalizing token...")
             
             # Fetch the token. We replace http with https for the library's internal check.
-            authorization_response = wsgi_app.last_request_uri.replace('http://', 'https://')
-            flow.fetch_token(authorization_response=authorization_response)
-            creds = flow.credentials
+            try:
+                authorization_response = wsgi_app.last_request_uri.replace('http://', 'https://')
+                flow.fetch_token(authorization_response=authorization_response)
+                creds = flow.credentials
+            except Exception as token_err:
+                logger.error(f"Failed to fetch token: {token_err}")
+                logger.error(f"Check if the redirect URL in Google Cloud exactly matches http://localhost:5080")
+                raise token_err
         
         logger.info(f"Saving new token to {TOKEN_PATH}")
         with open(TOKEN_PATH, "w") as token:

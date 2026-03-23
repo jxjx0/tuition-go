@@ -36,6 +36,8 @@ plugins:
       headers:
         - Authorization
         - Content-Type
+        - X-Google-Token
+        - X-User-Email
       exposed_headers:
         - Authorization
       credentials: true

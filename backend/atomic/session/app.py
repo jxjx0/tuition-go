@@ -14,7 +14,8 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Session Service",
     version="1.0",
-    description="Session atomic service"
+    description="Session atomic service",
+    prefix="/session"
 )
 
 # Supabase setup
@@ -105,8 +106,8 @@ class CreateSession(Resource):
             return {'message': 'Failed to create session', 'error': str(e)}, 500
 
 
-@api.route('/session/<string:sessionId>')
-class SessionResource(Resource):
+@api.route("/<string:sessionId>")
+class SessionDetail(Resource):
 
     @api.marshal_with(session_model)
     def get(self, sessionId):
@@ -144,7 +145,7 @@ class SessionResource(Resource):
         except APIError as e:
             return {'message': 'Failed to delete session', 'error': str(e)}, 500
 
-@api.route('/sessions')
+@api.route("/all")
 class SessionList(Resource):
 
     @api.doc(params={'tutorId': 'The ID of the tutor to filter by.', 'studentId': 'The ID of the student to filter by.'})
