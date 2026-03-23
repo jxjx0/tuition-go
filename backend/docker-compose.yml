@@ -42,6 +42,8 @@ services:
     build:
       context: ./atomic/student
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: student-service
     ports:
       - "5001:5001"
@@ -58,6 +60,8 @@ services:
     build:
       context: ./atomic/tutor
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: tutor-service
     ports:
       - "5002:5002"
@@ -74,6 +78,8 @@ services:
     build:
       context: ./atomic/session
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: session-service
     ports:
       - "5003:5003"
@@ -129,6 +135,8 @@ services:
     build:
       context: ./atomic/payment
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: payment-service
     ports:
       - "5007:5007"
