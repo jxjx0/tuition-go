@@ -111,5 +111,13 @@ class Checkout(Resource):
         return payment_resp.json(), 200
 
 
+            "session_id":        data.get("session_id"),
+            "student_id":        data.get("student_id"),
+            "tutor_id":          data.get("tutor_id"),
+            "amount_total":      data.get("amount_total"),
+            "stripe_session_id": data.get("stripe_session_id"),
+        }, 200
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5100, debug=True)

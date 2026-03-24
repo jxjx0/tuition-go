@@ -67,16 +67,39 @@ class CreateCheckoutSession(Resource):
                     "student_id": str(data.get("student_id", "")),
                     "tutor_id": str(data.get("tutor_id", "")),
                 },
-                success_url="http://localhost:5173/paymentSuccess",
+                success_url="http://localhost:5173/paymentSuccess?stripe_session_id={CHECKOUT_SESSION_ID}",
                 cancel_url="http://localhost:5173/paymentFailed"
             )
 
         return jsonify({"url": session.url})
 
+@api.route("/verify")
+class VerifyPayment(Resource):
+    def post(self):
+        data = request.get_json()
+        stripe_session_id = data.get("stripe_session_id")
+        if not stripe_session_id:
+            return {"message": "stripe_session_id is required"}, 400
+
+        stripe_session = stripe.checkout.Session.retrieve(stripe_session_id)
+
+        if stripe_session.payment_status != "paid":
+            return {"message": "Payment not completed"}, 402
+
+        metadata = stripe_session.metadata
+        return {
+            "session_id": metadata.get("session_id"),
+            "student_id": metadata.get("student_id"),
+            "tutor_id":   metadata.get("tutor_id"),
+            "amount_total": stripe_session.amount_total,
+        }, 200
+
+
 @api.route("/health")
 class Health(Resource):
     def get(self):
         return {"status": "healthy", "service": "payment"}, 200
-    
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5007, debug=True)
