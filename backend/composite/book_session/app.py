@@ -11,6 +11,12 @@ api = Api(app, doc="/docs",
     prefix="/book-session"
 )
 
+# Service URLs
+SESSION_SERVICE_URL = "http://session:5003"
+TUTOR_SERVICE_URL = "http://tutor:5002"
+STUDENT_SERVICE_URL = "http://student:5001"
+CALENDAR_SERVICE_URL = "http://calendar:5005"
+EMAIL_SERVICE_URL = "http://email:5006"
 
 @api.route("/health")
 class Health(Resource):
