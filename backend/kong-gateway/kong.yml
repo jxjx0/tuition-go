@@ -112,6 +112,11 @@ services:
 
   - name: payment-service
     url: http://payment:5007/payment
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: payment-route
         paths: [/api/v1/payments]
