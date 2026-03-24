@@ -3,17 +3,22 @@ import { useApi } from '../services/api'
 
 const api = useApi()
 
-async function handlePayment() {
-  const { data } = await api.post('/book-session/checkout', {
-    amount: 5000,
-    title: "Math Tuition",
-    description: "1 hour session",
-    booking_id: "123",
-    tutor_name: "John Doe",
-    subject: "Mathematics",
-    lesson_date: "2026-03-25"
-  })
-  window.location.href = data.url
+async function startCheckout() {
+  const { data } = await api.post(
+    "/payments/create-checkout-session",
+
+    {
+      title: "Trial Lesson",
+      description: "1-hour session",
+      amount: 3000,
+      tutor_name: "Mr. James Tan",
+      subject: "Secondary Math",
+      lesson_date: "2026-03-29 10:00 AM",
+      booking_id: 123,
+    },
+  );
+
+  window.location.href = data.url;
 }
 </script>
 
@@ -39,7 +44,7 @@ async function handlePayment() {
 
       <div class="mt-6 flex flex-col gap-3 sm:flex-row">
         <button
-          @click="handlePayment"
+          @click="startCheckout"
           class="rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
         >
           Book a trial lesson
