@@ -203,7 +203,16 @@ watch(activeTab, () => { saved.value = false })
 </script>
 
 <template>
-  <div class="min-h-screen py-8 md:py-12" style="background-color:#F5F7FA">
+   <div v-if="loading" class="text-center py-20">
+    <div class="inline-block animate-spin">
+      <svg class="w-8 h-8" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    </div>
+    <p class="mt-4" style="color:#1B3A5C">Loading tutor profile...</p>
+  </div>
+  <div v-else class="min-h-screen py-8 md:py-12" style="background-color:#F5F7FA">
     <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
 
       <router-link to="/dashboard" class="inline-flex items-center gap-2 text-sm font-medium mb-6 hover:opacity-80" style="color:#4A90D9">
