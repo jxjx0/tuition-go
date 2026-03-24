@@ -92,7 +92,7 @@ async function handleCreateSlot() {
 }
 const tutorId = computed(() => {
   const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
-  console.log(metadata)
+  // console.log(metadata)
   return typeof metadata?.tutorId === 'string' ? metadata.tutorId : null
 })
 const { tutor, searchForTutor, loading } = findTutorById()
@@ -105,7 +105,7 @@ async function fetchSessions(id: string) {
   sessionsLoading.value = true
   try {
     const { data } = await sessionService.getTutorSessions(id)
-    console.log('tutor sessions response:', JSON.stringify(data, null, 2))
+    // console.log('tutor sessions response:', JSON.stringify(data, null, 2))
     sessions.value = data
   } catch (err) {
     console.error('Failed to fetch sessions', err)
