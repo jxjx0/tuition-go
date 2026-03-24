@@ -3,13 +3,9 @@ import { useApi } from '../services/api'
 
 const api = useApi()
 
-async function startCheckout() {
-  const { data } = await api.post(
-    "/payments/create-checkout-session",
-
-function handlePayment() {
-  checkout({
-    amount: 5000, // $50.00 (Stripe uses cents)
+async function handlePayment() {
+  const { data } = await api.post('/book-session/checkout', {
+    amount: 5000,
     title: "Math Tuition",
     description: "1 hour session",
     booking_id: "123",
@@ -17,24 +13,8 @@ function handlePayment() {
     subject: "Mathematics",
     lesson_date: "2026-03-25"
   })
+  window.location.href = data.url
 }
-// async function startCheckout() {
-//   const { data } = await axios.post(
-//     "http://localhost:5007/create-checkout-session",
-
-//     {
-//       title: "Trial Lesson",
-//       description: "1-hour session",
-//       amount: 3000,
-//       tutor_name: "Mr. James Tan",
-//       subject: "Secondary Math",
-//       lesson_date: "2026-03-29 10:00 AM",
-//       booking_id: 123,
-//     },
-//   );
-
-//   window.location.href = data.url;
-// }
 </script>
 
 <template>
