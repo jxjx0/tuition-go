@@ -111,6 +111,25 @@ class Checkout(Resource):
         return payment_resp.json(), 200
 
 
+process_booking_input = api.model('ProcessBookingInput', {
+    'session_id':        fields.String(required=True, description='The session UUID'),
+    'student_id':        fields.String(required=True, description='The student UUID'),
+    'tutor_id':          fields.String(required=True, description='The tutor UUID'),
+    'amount_total':      fields.Integer(description='Amount paid in cents'),
+    'stripe_session_id': fields.String(description='Stripe checkout session ID'),
+})
+
+
+@api.route("/process-booking")
+class ProcessBooking(Resource):
+    @api.expect(process_booking_input)
+    def post(self):
+        """Called after successful Stripe payment to complete the booking."""
+        data = request.get_json()
+        # TODO: implement post-payment logic
+        # e.g. update session status to 'pending', send confirmation email, generate meeting link
+        return {
+            "message": "Booking confirmed",
             "session_id":        data.get("session_id"),
             "student_id":        data.get("student_id"),
             "tutor_id":          data.get("tutor_id"),
