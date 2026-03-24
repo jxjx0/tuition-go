@@ -45,14 +45,21 @@ const error = ref<string | null>(null)
 const showCancel = ref(false)
 const sessionService = useSessionService()
 const api = useApi()
+const booking = ref(false)
 
 async function bookSession() {
   if (!session.value || !currentStudentId.value) return
-  const { data } = await api.post('/book-session/checkout', {
-    session_id: session.value.id,
-    student_id: currentStudentId.value,
-  })
-  window.location.href = data.url
+  booking.value = true
+  try {
+    const { data } = await api.post('/book-session/checkout', {
+      session_id: session.value.id,
+      student_id: currentStudentId.value,
+    })
+    window.location.href = data.url
+  } catch (err) {
+    console.error('Failed to initiate booking', err)
+    booking.value = false
+  }
 }
 
 const metadata = computed(() => user.value?.unsafeMetadata as Record<string, unknown> | undefined)
@@ -188,7 +195,13 @@ onMounted(() => {
             </a>
           </div>
           <div class="flex flex-col sm:flex-row gap-3">
-            <button v-if="session.status==='available'&&userRole!=='tutor'" @click="bookSession" class="flex-1 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90" style="background-color:#2EAA4F">Book Session</button>
+            <button v-if="session.status==='available'&&userRole!=='tutor'" @click="bookSession" :disabled="booking" class="flex-1 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2" style="background-color:#2EAA4F">
+  <svg v-if="booking" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+  </svg>
+  {{ booking ? 'Processing...' : 'Book Session' }}
+</button>
             <button v-if="session.status==='pending'&&!showCancel&&userRole==='student'" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
             <router-link v-if="session.status==='completed'&&userRole==='student'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
           </div>
