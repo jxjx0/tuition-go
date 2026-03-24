@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import axios from "axios";
-import { ref, computed } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { publicApi } from '../services/api'
 
 async function startCheckout() {
-  const { data } = await axios.post(
-    "http://localhost:5007/create-checkout-session",
+  const { data } = await publicApi.post(
+    "/payments/create-checkout-session",
 
     {
       title: "Trial Lesson",
