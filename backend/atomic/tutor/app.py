@@ -26,6 +26,7 @@ api = Api(app, doc="/docs",
     title="Tutor Service",
     version="1.0",
     description="Tutor atomic service",
+    #All routes in this API will automatically start with /tutor, http://localhost:5002/tutor
     prefix="/tutor"
 )
 
