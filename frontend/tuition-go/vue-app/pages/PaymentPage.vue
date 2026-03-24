@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { publicApi } from '../services/api'
+import { useApi } from '../services/api'
+
+const api = useApi()
 
 async function startCheckout() {
-  const { data } = await publicApi.post(
+  const { data } = await api.post(
     "/payments/create-checkout-session",
 
     {
