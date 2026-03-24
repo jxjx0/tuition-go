@@ -12,7 +12,7 @@ export function usePaymentService() {
     subject: string
     lesson_date: string
   }) {
-    return api.post("/payment/create-checkout-session", data)
+    return api.post("/payments/create-checkout-session", data)
   }
 
   return {
