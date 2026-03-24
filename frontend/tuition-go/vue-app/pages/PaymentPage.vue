@@ -5,7 +5,7 @@ import { RouterLink, useRoute } from 'vue-router'
 
 async function startCheckout() {
   const { data } = await axios.post(
-    "http://localhost:5007/create-checkout-session",
+    "http://localhost:5007/payment/create-checkout-session",
 
     {
       title: "Trial Lesson",
