@@ -4,7 +4,9 @@ import { ref, computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { usePayment } from "../composables/usePayment"
 
-const { checkout, loading } = usePayment()
+async function startCheckout() {
+  const { data } = await axios.post(
+    "http://localhost:5007/payment/create-checkout-session",
 
 function handlePayment() {
   checkout({
