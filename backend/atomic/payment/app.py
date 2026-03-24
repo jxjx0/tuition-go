@@ -61,8 +61,12 @@ class CreateCheckoutSession(Resource):
                     "lesson_date": data["lesson_date"]
             }
             }],
-                client_reference_id=str(data["booking_id"]),
-                metadata={"booking_id": str(data["booking_id"])},
+                client_reference_id=str(data["session_id"]),
+                metadata={
+                    "session_id": str(data["session_id"]),
+                    "student_id": str(data.get("student_id", "")),
+                    "tutor_id": str(data.get("tutor_id", "")),
+                },
                 success_url="http://localhost:5173/paymentSuccess",
                 cancel_url="http://localhost:5173/paymentFailed"
             )

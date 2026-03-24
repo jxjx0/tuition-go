@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useUser } from '@clerk/vue'
 import { useSessionService } from '../services/sessionService'
+import { useApi } from '../services/api'
 
 interface Session {
   id: string
@@ -43,6 +44,16 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const showCancel = ref(false)
 const sessionService = useSessionService()
+const api = useApi()
+
+async function bookSession() {
+  if (!session.value || !currentStudentId.value) return
+  const { data } = await api.post('/book-session/checkout', {
+    session_id: session.value.id,
+    student_id: currentStudentId.value,
+  })
+  window.location.href = data.url
+}
 
 const metadata = computed(() => user.value?.unsafeMetadata as Record<string, unknown> | undefined)
 const currentStudentId = computed(() => typeof metadata.value?.studentId === 'string' ? metadata.value.studentId : null)
@@ -177,7 +188,7 @@ onMounted(() => {
             </a>
           </div>
           <div class="flex flex-col sm:flex-row gap-3">
-            <button v-if="session.status==='available'&&userRole!=='tutor'" disabled class="flex-1 py-3 rounded-xl text-sm font-bold text-white opacity-50 cursor-not-allowed" style="background-color:#2EAA4F">Book Session</button>
+            <button v-if="session.status==='available'&&userRole!=='tutor'" @click="bookSession" class="flex-1 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90" style="background-color:#2EAA4F">Book Session</button>
             <button v-if="session.status==='pending'&&!showCancel&&userRole==='student'" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
             <router-link v-if="session.status==='completed'&&userRole==='student'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
           </div>
