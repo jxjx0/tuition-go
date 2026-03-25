@@ -19,6 +19,7 @@ const { tutor, searchForTutor, loading } = findTutorById()
 const sessionService = useSessionService()
 
 const sessions = ref<any[]>([])
+const sessionsLoading = ref(true)
 const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
 const tutorReviews = computed(() => [])
 
@@ -29,6 +30,8 @@ onMounted(async () => {
     sessions.value = data
   } catch (err) {
     console.error('Failed to fetch sessions', err)
+  } finally {
+    sessionsLoading.value = false
   }
 })
 </script>
@@ -98,7 +101,13 @@ onMounted(async () => {
       </div>
       <div class="rounded-2xl border p-6 md:p-8 mb-8" style="background-color:#fff;border-color:#E8F0FE">
         <h2 class="text-lg font-bold mb-6" style="color:#1B3A5C">Available Sessions</h2>
-        <div v-if="availableSessions.length" class="space-y-3">
+        <div v-if="sessionsLoading" class="text-center py-12">
+          <svg class="animate-spin w-8 h-8 mx-auto" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        </div>
+        <div v-else-if="availableSessions.length" class="space-y-3">
           <div v-for="session in availableSessions" :key="session.sessionId" @click="$router.push('/session/' + session.sessionId)" class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border hover:shadow-sm cursor-pointer" style="border-color:#E8F0FE">
             <div class="flex items-center gap-4">
               <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background-color:#E8F0FE">
@@ -116,7 +125,7 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-        <div v-else class="text-center py-12">
+        <div v-else-if="!availableSessions.length" class="text-center py-12">
           <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style="background-color:#E8F0FE">
             <svg class="w-7 h-7" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>

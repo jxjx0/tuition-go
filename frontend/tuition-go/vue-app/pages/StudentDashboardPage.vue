@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useUser } from '@clerk/vue'
 import { useSessionService } from '../services/sessionService'
 
@@ -90,12 +90,6 @@ const pastSessions = computed(() => {
 
 const cancelledSessions = computed(() => {
   return sessions.value.filter(s => s.status === 'cancelled')
-})
-
-onMounted(() => {
-  if (isLoaded.value && currentStudentId.value) {
-    fetchSessions()
-  }
 })
 
 watch(
