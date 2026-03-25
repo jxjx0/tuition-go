@@ -42,7 +42,7 @@ export function useSessionService() {
       status?: string
       durationMins?: number
     }) {
-      return api.post('/sessions', payload)
+      return api.post('/sessions/session', payload)
     },
   }
 }
