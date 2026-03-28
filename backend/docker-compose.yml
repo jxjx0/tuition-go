@@ -111,9 +111,9 @@ services:
       - PYTHONUNBUFFERED=1
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
     ports:
       - "5005:5005"
-      - "5080:5080" #for Google
     volumes:
       - ./atomic/calendar:/app
     networks:

@@ -1,6 +1,5 @@
 import { ref } from 'vue'
 import { createGoogleMeeting, type MeetingRequest, type MeetingResponse } from '../services/meetingService'
-import { useUser } from '@clerk/vue'
 import { useApi } from '../services/api'
 
 /**
@@ -11,21 +10,13 @@ export function useMeeting() {
     const loading = ref(false)
     const error = ref<string | null>(null)
     const result = ref<MeetingResponse | null>(null)
-    const { user } = useUser()
     const api = useApi()
 
     async function createMeeting(data: MeetingRequest) {
         loading.value = true
         error.value = null
         try {
-            // Get user email from Clerk session
-            const userEmail = user.value?.primaryEmailAddress?.emailAddress
-            if (!userEmail) {
-                console.warn('Meeting: No primary email found in Clerk session.')
-            }
-
-            // We pass undefined for googleToken as it's not reliably available on frontend
-            const res = await createGoogleMeeting(api, data, undefined, userEmail)
+            const res = await createGoogleMeeting(api, data)
             result.value = res
             return res
         } catch (err: any) {
