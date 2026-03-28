@@ -18,16 +18,9 @@ export interface MeetingResponse {
 
 /**
  * Layer 2: Meeting Service
- * Pure functions for interacting with the meeting/calendar endpoints.
+ * Pure functions for interacting with the calendar endpoint.
  */
-export async function createGoogleMeeting(api: AxiosInstance, data: MeetingRequest, googleToken?: string, userEmail?: string): Promise<MeetingResponse> {
-    const headers: Record<string, string> = {}
-    if (googleToken) {
-        headers['X-Google-Token'] = googleToken
-    }
-    if (userEmail) {
-        headers['X-User-Email'] = userEmail
-    }
-    const response = await api.post<MeetingResponse>('/calendar/create-meeting', data, { headers })
+export async function createGoogleMeeting(api: AxiosInstance, data: MeetingRequest): Promise<MeetingResponse> {
+    const response = await api.post<MeetingResponse>('/calendar/create-meeting', data)
     return response.data
 }

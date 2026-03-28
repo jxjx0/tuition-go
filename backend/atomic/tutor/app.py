@@ -209,6 +209,7 @@ class GetTutorById(Resource):
                 supabase.table("Tutor")
                 .select("""
                     tutorId,
+                    clerkUserId,
                     name,
                     email,
                     phone,

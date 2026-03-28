@@ -39,6 +39,7 @@ session_model = api.model('Session', {
     'status': fields.String(description='The session status'),
     'durationMins': fields.Float(description='The duration of the session in minutes'),
     'meetingLink': fields.String(description='The meeting link'),
+    'calendarEventId': fields.String(description='The Google Calendar event ID'),
     'createdAt': fields.DateTime(description='The creation timestamp'),
     'updatedAt': fields.DateTime(description='The last update timestamp')
 })
@@ -52,6 +53,7 @@ session_input_model = api.model('SessionInput', {
     'status': fields.String(description='The session status', example='pending'),
     'durationMins': fields.Float(description='The duration of the session in minutes', example=60),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
+    'calendarEventId': fields.String(description='The Google Calendar event ID', example='abc123xyz'),
 })
 
 session_update_model = api.model('SessionUpdate', {
@@ -61,6 +63,7 @@ session_update_model = api.model('SessionUpdate', {
     'status': fields.String(description='The session status', example='confirmed'),
     'durationMins': fields.Float(description='The duration of the session in minutes', example=90),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
+    'calendarEventId': fields.String(description='The Google Calendar event ID', example='abc123xyz'),
 })
 
 
