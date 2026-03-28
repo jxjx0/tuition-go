@@ -1,9 +1,6 @@
 import os
-import json
-import pika
 import uuid
 import jwt as pyjwt
-import threading
 import requests as http_requests
 from flask import Flask, request
 from flask_restx import Api, Resource, fields
@@ -12,7 +9,6 @@ from flask_cors import CORS
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from supabase import create_client, Client
 from dotenv import load_dotenv
 
 import logging
@@ -26,9 +22,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-supabase_url = os.environ.get("SUPABASE_URL", "")
-supabase_key = os.environ.get("SUPABASE_KEY", "")
-supabase: Client = create_client(supabase_url, supabase_key)
 
 CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
 
@@ -67,169 +60,12 @@ def get_google_token_for_user(clerk_user_id: str) -> str:
     return data[0]["token"]
 
 
-def get_calendar_service(clerk_user_id: str = None, access_token: str = None):
+def get_calendar_service(clerk_user_id: str) -> object:
     """Builds a Google Calendar API service using a Clerk user's OAuth token."""
-    creds = None
-
-    if access_token:
-        logger.info("Using provided access token...")
-        creds = Credentials(token=access_token)
-    elif clerk_user_id:
-        logger.info(f"Fetching Google token from Clerk for user {clerk_user_id}...")
-        token = get_google_token_for_user(clerk_user_id)
-        creds = Credentials(token=token)
-
-    if not creds:
-        raise Exception("No authentication source available. Provide clerk_user_id or access_token.")
-
+    logger.info(f"Fetching Google token from Clerk for user {clerk_user_id}...")
+    token = get_google_token_for_user(clerk_user_id)
+    creds = Credentials(token=token)
     return build("calendar", "v3", credentials=creds)
-
-
-# ==================== RabbitMQ Worker ====================
-RABBITMQ_URL = os.environ.get("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
-
-def handle_session_created(session_data):
-    """Creates a Google Meeting for a new session slot."""
-    logger.info(f"Worker: Handling session.created for {session_data.get('sessionId')}")
-    # Requires tutorClerkId in the session message payload.
-    # TODO: Update the session service to include tutorClerkId when publishing session.created.
-    tutor_clerk_id = session_data.get('tutorClerkId')
-    if not tutor_clerk_id:
-        logger.error("Worker: No tutorClerkId in session data. Cannot authenticate with Google Calendar.")
-        return
-
-    try:
-        service = get_calendar_service(clerk_user_id=tutor_clerk_id)
-    except Exception as e:
-        logger.error(f"Worker: Could not get calendar service: {e}")
-        return
-
-    try:
-        event_body = {
-            'summary': f"Tutor Session (Pending)",
-            'description': 'Generated automatically by TuitionGo.',
-            'start': {'dateTime': session_data['startTime'] + 'Z', 'timeZone': 'UTC'},
-            'end': {'dateTime': session_data['endTime'] + 'Z', 'timeZone': 'UTC'},
-            'conferenceData': {
-                'createRequest': {
-                    'requestId': f"req-{session_data['sessionId']}",
-                    'conferenceSolutionKey': {'type': 'hangoutsMeet'}
-                }
-            }
-        }
-
-        event = service.events().insert(
-            calendarId='primary',
-            body=event_body,
-            conferenceDataVersion=1
-        ).execute()
-
-        meeting_link = event.get('hangoutLink')
-
-        supabase.table('Session').update({
-            'meetingLink': meeting_link,
-        }).eq('sessionId', session_data['sessionId']).execute()
-
-        logger.info(f"Worker: Successfully created meeting {meeting_link}")
-    except Exception as e:
-        logger.error(f"Worker error in session.created: {e}")
-
-
-def handle_session_booked(session_data):
-    """Updates the existing meeting with student details."""
-    logger.info(f"Worker: Handling session.booked for {session_data.get('sessionId')}")
-    tutor_clerk_id = session_data.get('tutorClerkId')
-    if not tutor_clerk_id:
-        logger.error("Worker: No tutorClerkId in session data. Cannot authenticate with Google Calendar.")
-        return
-
-    try:
-        service = get_calendar_service(clerk_user_id=tutor_clerk_id)
-    except Exception as e:
-        logger.error(f"Worker: Could not get calendar service: {e}")
-        return
-
-    try:
-        start_time = session_data['startTime'] + 'Z'
-        events_result = service.events().list(
-            calendarId='primary',
-            timeMin=start_time,
-            maxResults=10,
-            singleEvents=True
-        ).execute()
-        events = events_result.get('items', [])
-
-        target_event = None
-        for event in events:
-            if event.get('start', {}).get('dateTime') == start_time:
-                target_event = event
-                break
-
-        if target_event:
-            target_event['summary'] = f"Tutor Session (Booked)"
-            attendees = target_event.get('attendees', [])
-            if session_data.get('studentEmail'):
-                attendees.append({'email': session_data['studentEmail']})
-                target_event['attendees'] = attendees
-
-            service.events().update(
-                calendarId='primary',
-                eventId=target_event['id'],
-                body=target_event,
-                sendUpdates='all'
-            ).execute()
-            logger.info(f"Worker: Successfully updated event {target_event['id']} for booking.")
-        else:
-            logger.warning(f"Worker: Could not find event to update for session {session_data.get('sessionId')}")
-
-    except Exception as e:
-        logger.error(f"Worker error in session.booked: {e}")
-
-
-def start_event_worker():
-    """Starts the RabbitMQ consumer loop with retry logic."""
-    import time
-    max_retries = 10
-    retry_delay = 5
-
-    for attempt in range(max_retries):
-        try:
-            params = pika.URLParameters(RABBITMQ_URL)
-            connection = pika.BlockingConnection(params)
-            channel = connection.channel()
-
-            channel.exchange_declare(exchange='session_events', exchange_type='topic', durable=True)
-            result = channel.queue_declare(queue='calendar_updates', durable=True)
-            queue_name = result.method.queue
-
-            channel.queue_bind(exchange='session_events', queue=queue_name, routing_key='session.*')
-
-            def callback(ch, method, properties, body):
-                try:
-                    data = json.loads(body)
-                    routing_key = method.routing_key
-                    if routing_key == 'session.created':
-                        handle_session_created(data)
-                    elif routing_key == 'session.booked':
-                        handle_session_booked(data)
-                    ch.basic_ack(delivery_tag=method.delivery_tag)
-                except Exception as cb_err:
-                    logger.error(f"Worker callback error: {cb_err}")
-
-            channel.basic_consume(queue=queue_name, on_message_callback=callback)
-            logger.info(" [*] Calendar worker started. Waiting for messages...")
-            channel.start_consuming()
-            break
-        except Exception as e:
-            logger.warning(f"Worker connection attempt {attempt+1}/{max_retries} failed: {e}. Retrying in {retry_delay}s...")
-            time.sleep(retry_delay)
-    else:
-        logger.error("Worker failed to connect after multiple retries. Background work disabled.")
-
-
-worker_thread = threading.Thread(target=start_event_worker)
-worker_thread.daemon = True
-worker_thread.start()
 
 
 @api.route("/health")
