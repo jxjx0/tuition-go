@@ -26,6 +26,7 @@ export function useSessionService() {
       endTime?: string
       durationMins?: number
       meetingLink?: string
+      calendarEventId?: string
     }) {
       return api.put(`/sessions/${sessionId}`, payload)
     },

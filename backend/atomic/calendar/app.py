@@ -48,6 +48,12 @@ meeting_model = api.model('MeetingRequest', {
     'attendees': fields.List(fields.String, description='List of attendee emails')
 })
 
+update_meeting_model = api.model('UpdateMeetingRequest', {
+    'eventId': fields.String(required=True, description='Google Calendar event ID to update'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+    'studentEmail': fields.String(required=True, description='Student email to add as attendee'),
+})
+
 
 def get_google_token_for_user(clerk_user_id: str) -> str:
     """Fetches the user's Google OAuth token from Clerk's Backend API."""
@@ -60,7 +66,7 @@ def get_google_token_for_user(clerk_user_id: str) -> str:
     return data[0]["token"]
 
 
-def get_calendar_service(clerk_user_id: str) -> object:
+def get_calendar_service(clerk_user_id: str):
     """Builds a Google Calendar API service using a Clerk user's OAuth token."""
     logger.info(f"Fetching Google token from Clerk for user {clerk_user_id}...")
     token = get_google_token_for_user(clerk_user_id)
@@ -159,6 +165,63 @@ class CreateMeeting(Resource):
             return {"error": f"An error occurred: {error}"}, 500
         except Exception as e:
             logger.exception("General Error occurred during meeting creation")
+            return {"error": str(e)}, 500
+
+
+@api.route("/update-meeting")
+class UpdateMeeting(Resource):
+    @api.expect(update_meeting_model)
+    def post(self):
+        """Adds a student as attendee to an existing tutor calendar event."""
+        data = request.json
+        event_id = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+        student_email = data.get('studentEmail')
+
+        if not event_id or not tutor_clerk_id or not student_email:
+            return {"error": "eventId, tutorClerkId and studentEmail are required"}, 400
+
+        # Use the TUTOR's Google token — the student made the HTTP request
+        # but we update the tutor's calendar
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get tutor calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            # Fetch the existing event from tutor's calendar
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+
+            # Add student to attendees if not already present
+            attendees = event.get('attendees', [])
+            already_added = any(a.get('email', '').lower() == student_email.lower() for a in attendees)
+            if not already_added:
+                attendees.append({'email': student_email})
+                event['attendees'] = attendees
+
+            # Update event title to reflect booking
+            event['summary'] = event.get('summary', 'Tutor Session').replace('(Pending)', '(Booked)')
+
+            updated_event = service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event,
+                sendUpdates='all'  # emails invite to student automatically
+            ).execute()
+
+            logger.info(f"Event {event_id} updated with student {student_email}")
+            return {
+                "message": "Meeting updated successfully",
+                "eventId": updated_event.get('id'),
+                "hangoutLink": updated_event.get('hangoutLink')
+            }, 200
+
+        except HttpError as error:
+            logger.error(f"HTTP Error updating event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error updating meeting")
             return {"error": str(e)}, 500
 
 

@@ -19,39 +19,10 @@ function fmtTime(d: string) {
   return toUtcDate(d).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
-
 const { user } = useUser()
-const { loading: meetingLoading, error: meetingError, result: meetingResult, createMeeting } = useMeeting()
-
-const meetingForm = ref({
-  summary: 'Tutor Session',
-  description: '',
-  date: '',
-  startTime: '',
-  endTime: ''
-})
-
-async function handleCreateMeeting() {
-  try {
-    const start = `${meetingForm.value.date}T${meetingForm.value.startTime}:00Z`
-    const end = `${meetingForm.value.date}T${meetingForm.value.endTime}:00Z`
-    
-    await createMeeting({
-      summary: meetingForm.value.summary,
-      description: meetingForm.value.description,
-      start_time: start,
-      end_time: end,
-      attendees: [] // Optional: fetch student email if linked to a specific session
-    })
-    
-    showCreateMeeting.value = false
-  } catch (err) {
-    console.error('Meeting creation failed:', err)
-  }
-}
+const { createMeeting } = useMeeting()
 
 const showCreateSlot = ref(false)
-const showCreateMeeting = ref(false)
 
 const sessionService = useSessionService()
 const slotForm = ref({ tutorSubjectId: '', date: '', startTime: '', endTime: '' })
@@ -71,9 +42,15 @@ async function handleCreateSlot() {
     slotError.value = 'End time must be after start time'
     return
   }
+
+  // Find the subject name for the meeting summary
+  const selectedSubject = tutor.value?.subjects?.find(s => s.tutorSubjectId === slotForm.value.tutorSubjectId)
+  const subjectLabel = selectedSubject ? `${selectedSubject.subject} (${selectedSubject.academicLevel})` : 'Tutor Session'
+
   slotCreating.value = true
   try {
-    await sessionService.createSession({
+    // 1. Create the session slot
+    const { data: newSession } = await sessionService.createSession({
       tutorId: tutorId.value!,
       tutorSubjectId: slotForm.value.tutorSubjectId,
       startTime,
@@ -81,6 +58,34 @@ async function handleCreateSlot() {
       status: 'available',
       durationMins,
     })
+
+    // 2. Create the Google Calendar event on the tutor's calendar
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const meetingResult = await createMeeting({
+        summary: subjectLabel,
+        description: 'Tuition session created via TuitionGo.',
+        start_time: startTime,
+        end_time: endTime,
+        timezone: tz,
+        attendees: []
+      })
+
+      // 3. Save calendarEventId and meetingLink back to the session record
+      if (meetingResult?.eventId && newSession?.sessionId) {
+        try {
+          await sessionService.updateSession(newSession.sessionId, {
+            calendarEventId: meetingResult.eventId,
+            meetingLink: meetingResult.hangoutLink,
+          })
+        } catch (updateErr) {
+          console.warn('Session created but failed to save calendarEventId:', updateErr)
+        }
+      }
+    } catch (calendarErr) {
+      console.warn('Session created but calendar event failed:', calendarErr)
+    }
+
     slotForm.value = { tutorSubjectId: '', date: '', startTime: '', endTime: '' }
     showCreateSlot.value = false
     if (tutorId.value) fetchSessions(tutorId.value)
@@ -90,12 +95,12 @@ async function handleCreateSlot() {
     slotCreating.value = false
   }
 }
+
 const tutorId = computed(() => {
   const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
-  // console.log(metadata)
   return typeof metadata?.tutorId === 'string' ? metadata.tutorId : null
 })
-const { tutor, searchForTutor, loading } = findTutorById()
+const { tutor, searchForTutor } = findTutorById()
 
 const sessions = ref<any[]>([])
 const sessionsLoading = ref(false)
@@ -105,7 +110,6 @@ async function fetchSessions(id: string) {
   sessionsLoading.value = true
   try {
     const { data } = await sessionService.getTutorSessions(id)
-    // console.log('tutor sessions response:', JSON.stringify(data, null, 2))
     sessions.value = data
   } catch (err) {
     console.error('Failed to fetch sessions', err)
@@ -147,53 +151,10 @@ const tutorStats = [
           <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Welcome back, James. Manage your sessions and availability.</p>
         </div>
         <div class="flex gap-4">
-          <button @click="showCreateMeeting=!showCreateMeeting; showCreateSlot=false" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#4A90D9">Create Google Meeting</button>
-          <button @click="showCreateSlot=!showCreateSlot; showCreateMeeting=false" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#2EAA4F">+ Create Session Slot</button>
+          <button @click="showCreateSlot=!showCreateSlot" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#2EAA4F">+ Create Session Slot</button>
         </div>
       </div>
 
-      <!-- Create Google Meeting Form -->
-      <div v-if="showCreateMeeting" class="rounded-2xl border p-6 mb-8" style="background-color:#fff;border-color:#E8F0FE">
-        <h3 class="text-lg font-bold mb-4" style="color:#1B3A5C">Create Google Meeting</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div>
-            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Title</label>
-            <input v-model="meetingForm.summary" type="text" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C" placeholder="e.g. Math Tutoring Session"/>
-          </div>
-          <div>
-            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Date</label>
-            <input v-model="meetingForm.date" type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
-          </div>
-          <div>
-            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Start Time (UTC)</label>
-            <input v-model="meetingForm.startTime" type="time" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
-          </div>
-          <div>
-            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">End Time (UTC)</label>
-            <input v-model="meetingForm.endTime" type="time" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
-          </div>
-        </div>
-        <div class="mb-4">
-          <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Description (Optional)</label>
-          <textarea v-model="meetingForm.description" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C" rows="2"></textarea>
-        </div>
-        
-        <div v-if="meetingError" class="mb-4 p-3 rounded-lg bg-red-50 text-red-600 text-xs">
-          {{ meetingError }}
-        </div>
-
-        <div v-if="meetingResult" class="mb-4 p-4 rounded-xl bg-blue-50 border border-blue-100">
-          <p class="text-sm font-bold text-blue-800 mb-2">Meeting Created!</p>
-          <a :href="meetingResult.hangoutLink" target="_blank" class="text-xs text-blue-600 underline font-medium">Join Meeting: {{ meetingResult.hangoutLink }}</a>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <button @click="handleCreateMeeting" :disabled="meetingLoading" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style="background-color:#4A90D9">
-            {{ meetingLoading ? 'Creating...' : 'Create Meeting' }}
-          </button>
-          <button @click="showCreateMeeting=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">Cancel</button>
-        </div>
-      </div>
       <div v-if="showCreateSlot" class="rounded-2xl border p-6 mb-8" style="background-color:#fff;border-color:#E8F0FE">
         <h3 class="text-lg font-bold mb-4" style="color:#1B3A5C">New Session Slot</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -231,6 +192,7 @@ const tutorStats = [
           <button @click="showCreateSlot=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">Cancel</button>
         </div>
       </div>
+
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <div v-for="stat in tutorStats" :key="stat.label" class="rounded-2xl border p-5" style="background-color:#fff;border-color:#E8F0FE">
           <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-3" :style="{backgroundColor:stat.bg}">
@@ -242,6 +204,7 @@ const tutorStats = [
           <p class="text-xs font-medium mt-0.5" style="color:#1B3A5C;opacity:0.6">{{ stat.label }}</p>
         </div>
       </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2">
           <div class="flex items-center justify-between mb-4">
