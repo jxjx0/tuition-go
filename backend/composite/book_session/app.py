@@ -182,10 +182,11 @@ class ProcessBooking(Resource):
         if not student_email:
             return {"message": "Student email not found"}, 500
 
-        # 4. Update session status to booked
+        # 4. Update session status to booked and assign student
+        student_id = data.get("student_id")
         update_resp = requests.put(
             f"{SESSION_SERVICE_URL}/session/{session_id}",
-            json={"status": "booked"},
+            json={"status": "booked", "studentId": student_id},
             headers={"Authorization": auth_header},
             timeout=5
         )
