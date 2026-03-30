@@ -83,12 +83,10 @@ async function handleLogout() {
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <router-link to="/" class="flex items-center gap-2.5">
-          <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:linear-gradient(135deg,#4A90D9,#1B3A5C)">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-            </svg>
-          </div>
-          <span class="text-xl font-bold tracking-tight" style="color:#1B3A5C">EduMatch</span>
+          <!-- Logo: replace /logo.png with your actual logo file placed in the public folder -->
+          <img src="/logo.png" alt="TuitionGo" class="h-20 w-auto object-contain"
+               @error="(e) => (e.target as HTMLImageElement).style.display='none'"/>
+          <span class="text-xl font-bold tracking-tight" style="color:#1B3A5C">TuitionGo</span>
         </router-link>
         <div class="hidden md:flex items-center gap-1">
           <router-link v-for="link in navLinks" :key="link.to" :to="link.to" class="px-4 py-2 rounded-lg text-sm font-medium transition-all" :style="isActive(link.to)?'background-color:#E8F0FE;color:#4A90D9':'color:#1B3A5C'">{{ link.label }}</router-link>
