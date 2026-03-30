@@ -51,7 +51,7 @@ async function bookSession() {
   if (!session.value || !currentStudentId.value) return
   booking.value = true
   try {
-    const { data } = await api.post('/book-session/checkout', {
+    const { data } = await api.post('/checkout/checkout', {
       session_id: session.value.id,
       student_id: currentStudentId.value,
     })
