@@ -19,7 +19,8 @@ services:
       - calendar
       - email
       - payment
-      - book-session
+      - checkout
+      - process-booking
       - cancel-session
       - rate-tutor
       - get-sessions
@@ -145,17 +146,31 @@ services:
     restart: unless-stopped
 
   # ==================== COMPOSITE SERVICES ====================
-  book-session:
+  checkout:
     build:
-      context: ./composite/book_session
+      context: ./composite/checkout
       dockerfile: Dockerfile
-    container_name: book-session-service
+    container_name: checkout-service
     ports:
       - "5100:5100"
     environment:
       - SESSION_SERVICE_URL=http://session:5003
       - TUTOR_SERVICE_URL=http://tutor:5002
       - PAYMENT_SERVICE_URL=http://payment:5007
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  process-booking:
+    build:
+      context: ./composite/process_booking
+      dockerfile: Dockerfile
+    container_name: process-booking-service
+    ports:
+      - "5104:5104"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
       - STUDENT_SERVICE_URL=http://student:5001
       - CALENDAR_SERVICE_URL=http://calendar:5005
     networks:
