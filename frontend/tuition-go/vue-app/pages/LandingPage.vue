@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { SignInButton, SignUpButton } from '@clerk/vue'
+import { SignUpButton } from '@clerk/vue'
 
 const heroTutors = [
   { name: 'James Tan', subject: 'A-Level Mathematics', rating: '4.9', rate: '65', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=James' },
@@ -68,7 +68,7 @@ const whyFeatures = [
   },
 ]
 const testimonials = [
-  { name: 'Rachel Tan', role: 'A-Level Student, ACJC', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Rachel', quote: 'EduMatch helped me find the perfect Math tutor. My grades went from C to A in just 4 months!' },
+  { name: 'Rachel Tan', role: 'A-Level Student, ACJC', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=Rachel', quote: 'TuitionGo helped me find the perfect Math tutor. My grades went from C to A in just 4 months!' },
   { name: 'Mrs. Koh', role: 'Parent of O-Level Student', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=MrsKoh', quote: 'As a working parent, I love that I can easily book and manage my son\'s tuition sessions.' },
   { name: 'David Lim', role: 'IB Student, UWC SEA', avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=David', quote: 'The tutors here are incredibly qualified. Sarah helped me score a 7 for IB Chemistry.' },
 ]
@@ -87,10 +87,10 @@ const testimonials = [
             <h1 class="text-4xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight" style="text-wrap:balance">Find Your <span style="color:#2EAA4F">Perfect Tutor</span> in Singapore</h1>
             <p class="mt-6 text-lg md:text-xl leading-relaxed" style="color:rgba(255,255,255,0.85);text-wrap:balance">Connect with highly qualified, MOE-registered tutors for O-Level, A-Level, and IB subjects. Book sessions, learn via Google Meet, and excel in your exams.</p>
             <div class="mt-8 flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
-              <SignInButton mode="modal" fallback-redirect-url="/#/dashboard">
+              <SignUpButton mode="redirect" fallback-redirect-url="/auth-redirect">
                 <button class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold text-white transition-all duration-200 hover:scale-105 shadow-lg" style="background-color:#2EAA4F">Start Learning Today</button>
-              </SignInButton>
-              <router-link to="/tutors" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold transition-all duration-200 hover:scale-105" style="background-color:rgba(255,255,255,0.15);color:#fff;backdrop-filter:blur(8px)">Browse Tutors</router-link>
+              </SignUpButton>
+              <router-link to="/login" class="w-full sm:w-auto px-8 py-4 rounded-xl text-base font-bold transition-all duration-200 hover:scale-105" style="background-color:rgba(255,255,255,0.15);color:#fff;backdrop-filter:blur(8px)">Log In</router-link>
             </div>
           </div>
           <div class="flex-1 w-full max-w-md lg:max-w-lg">
@@ -224,14 +224,15 @@ const testimonials = [
       </div>
     </section>
 
-    <section class="py-20" style="background-color:#E8F0FE">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-16">
-          <p class="text-sm font-semibold uppercase tracking-wider mb-3" style="color:#4A90D9">Testimonials</p>
-          <h2 class="text-3xl md:text-4xl font-extrabold" style="color:#1B3A5C;text-wrap:balance">Loved by students and parents</h2>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div v-for="(t,i) in testimonials" :key="i" class="p-6 rounded-2xl bg-white shadow-sm border transition-all duration-300 hover:-translate-y-1" style="border-color:rgba(74,144,217,0.1)">
+    <section class="py-20 overflow-hidden" style="background-color:#E8F0FE">
+      <div class="text-center mb-16 px-4">
+        <p class="text-sm font-semibold uppercase tracking-wider mb-3" style="color:#4A90D9">Testimonials</p>
+        <h2 class="text-3xl md:text-4xl font-extrabold" style="color:#1B3A5C;text-wrap:balance">Loved by students and parents</h2>
+      </div>
+      <!-- Marquee track — duplicated for seamless loop -->
+      <div class="marquee-track flex gap-6">
+        <template v-for="pass in 2" :key="pass">
+          <div v-for="(t,i) in testimonials" :key="`${pass}-${i}`" class="marquee-card flex-shrink-0 w-80 p-6 rounded-2xl bg-white shadow-sm border" style="border-color:rgba(74,144,217,0.1)">
             <div class="flex items-center gap-1 mb-4">
               <svg v-for="s in 5" :key="s" class="w-4 h-4" fill="#F59E0B" viewBox="0 0 24 24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
@@ -246,17 +247,17 @@ const testimonials = [
               </div>
             </div>
           </div>
-        </div>
+        </template>
       </div>
     </section>
 
     <section class="py-20" style="background:linear-gradient(135deg,#1B3A5C 0%,#4A90D9 100%)">
       <div class="max-w-3xl mx-auto px-4 text-center">
         <h2 class="text-3xl md:text-4xl font-extrabold text-white mb-6" style="text-wrap:balance">Ready to ace your exams?</h2>
-        <p class="text-lg mb-8" style="color:rgba(255,255,255,0.85)">Join thousands of Singapore students already learning with EduMatch. Sign up now and get your first session at 20% off.</p>
-        <SignInButton mode="modal" fallback-redirect-url="/#/dashboard">
+        <p class="text-lg mb-8" style="color:rgba(255,255,255,0.85)">Connect with verified Singapore tutors, book sessions in minutes, and start hitting your academic goals — all in one place.</p>
+        <SignUpButton mode="redirect" fallback-redirect-url="/auth-redirect">
           <button class="inline-block px-10 py-4 rounded-xl text-lg font-bold transition-all duration-200 hover:scale-105 shadow-lg" style="background-color:#2EAA4F;color:#fff">Get Started for Free</button>
-        </SignInButton>
+        </SignUpButton>
       </div>
     </section>
   </div>
@@ -273,5 +274,17 @@ const testimonials = [
 .step-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+.marquee-track {
+  animation: marquee-right 18s linear infinite;
+  width: max-content;
+}
+.marquee-track:hover {
+  animation-play-state: paused;
+}
+@keyframes marquee-right {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
 }
 </style>
