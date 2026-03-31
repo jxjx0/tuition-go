@@ -123,11 +123,19 @@ services:
         methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
-  - name: book-session-service
-    url: http://book-session:5100/book-session
+  - name: checkout-service
+    url: http://checkout:5100/checkout
     routes:
-      - name: book-session-route
-        paths: [/api/v1/book-session]
+      - name: checkout-route
+        paths: [/api/v1/checkout]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
+  - name: process-booking-service
+    url: http://process-booking:5104/process-booking
+    routes:
+      - name: process-booking-route
+        paths: [/api/v1/process-booking]
         methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 

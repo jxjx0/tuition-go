@@ -42,7 +42,7 @@ onMounted(async () => {
 
     // Step 2: Process booking
     steps.value[2].status = 'loading'
-    const { data: bookingData } = await api.post("/book-session/process-booking", {
+    const { data: bookingData } = await api.post("/process-booking/process-booking", {
       session_id:        paymentData.session_id,
       student_id:        paymentData.student_id,
       tutor_id:          paymentData.tutor_id,

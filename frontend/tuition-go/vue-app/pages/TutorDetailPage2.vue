@@ -159,6 +159,13 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    <div v-else-if="loading" class="text-center py-20">
+      <svg class="animate-spin w-10 h-10 mx-auto mb-4" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      <p class="text-lg font-semibold" style="color:#1B3A5C">Loading tutor details...</p>
+    </div>
     <div v-else class="text-center py-20">
       <h2 class="text-2xl font-bold" style="color:#1B3A5C">Tutor not found</h2>
       <router-link to="/tutors" class="mt-4 inline-block px-6 py-2 rounded-lg text-sm font-semibold text-white" style="background-color:#4A90D9">Browse Tutors</router-link>
