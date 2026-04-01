@@ -22,6 +22,7 @@ services:
       - checkout
       - process-booking
       - create-session
+      - update-session
       - cancel-session
       - rate-tutor
       - get-sessions
@@ -188,6 +189,21 @@ services:
       - "5105:5105"
     environment:
       - SESSION_SERVICE_URL=http://session:5003
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  update-session:
+    build:
+      context: ./composite/update_session
+      dockerfile: Dockerfile
+    container_name: update-session-service
+    ports:
+      - "5106:5106"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
       - CALENDAR_SERVICE_URL=http://calendar:5005
     networks:
       - tuition-network

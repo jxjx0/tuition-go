@@ -20,30 +20,19 @@ export function useSessionService() {
       return api.get(`/getsessions/session/${sessionId}`)
     },
 
-    updateSession(sessionId: string, payload: {
-      tutorSubjectId?: string
-      startTime?: string
-      endTime?: string
-      durationMins?: number
-      meetingLink?: string
-      calendarEventId?: string
+    updateSessionWithCalendar(sessionId: string, payload: {
+      tutorSubjectId: string
+      startTime: string
+      endTime: string
+      durationMins: number
+      summary: string
+      timezone: string
     }) {
-      return api.put(`/sessions/${sessionId}`, payload)
+      return api.put(`/update-session/${sessionId}`, payload)
     },
 
     deleteSession(sessionId: string) {
       return api.delete(`/sessions/${sessionId}`)
-    },
-
-    createSession(payload: {
-      tutorId: string
-      tutorSubjectId: string
-      startTime: string
-      endTime: string
-      status?: string
-      durationMins?: number
-    }) {
-      return api.post('/sessions/session', payload)
     },
 
     createSessionWithCalendar(payload: {

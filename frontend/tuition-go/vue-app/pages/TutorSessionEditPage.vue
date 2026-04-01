@@ -80,11 +80,17 @@ async function saveSession() {
   }
   saving.value = true
   try {
-    await sessionService.updateSession(sessionId, {
+    const selectedSubject = tutor.value?.subjects?.find((s: any) => s.tutorSubjectId === form.value.tutorSubjectId)
+    const summary = selectedSubject ? `${selectedSubject.subject} (${selectedSubject.academicLevel})` : 'Tutor Session'
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+    await sessionService.updateSessionWithCalendar(sessionId, {
       tutorSubjectId: form.value.tutorSubjectId,
       startTime,
       endTime,
       durationMins,
+      summary,
+      timezone: tz,
     })
     const { data: refreshed } = await sessionService.getSessionById(sessionId)
     session.value = refreshed
@@ -93,7 +99,7 @@ async function saveSession() {
     saved.value = true
     setTimeout(() => { saved.value = false }, 3000)
   } catch (err: any) {
-    saveError.value = err?.response?.data?.error || 'Failed to save session'
+    saveError.value = err?.response?.data?.message || err?.response?.data?.error || 'Failed to save session'
   } finally {
     saving.value = false
   }
