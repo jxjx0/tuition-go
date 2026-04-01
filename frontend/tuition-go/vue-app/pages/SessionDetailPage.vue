@@ -74,7 +74,7 @@ const isOwner = computed(() =>
 
 const statusLabel = computed(() => { 
   if (!session.value) return ''
-  const m: Record<string, string> = { pending: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled', available: 'Available' }
+  const m: Record<string, string> = { available: 'Available', booked: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled' }
   return m[session.value.status] || session.value.status 
 })
 
@@ -171,21 +171,38 @@ onMounted(() => {
             </div>
             <p class="text-xl font-extrabold" style="color:#2EAA4F">${{ session.price.toFixed(2) }}</p>
           </div>
-          <div class="space-y-4">
-            <div class="flex items-center justify-between py-3 border-b" style="border-color:#E8F0FE">
-              <span class="text-sm" style="color:#1B3A5C;opacity:0.7">Date</span>
-              <span class="text-sm font-semibold" style="color:#1B3A5C">{{ fmtDate(session.date) }}</span>
+          <div class="rounded-xl p-4 space-y-3" style="background-color:#F5F7FA;border:1px solid #E8F0FE">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color:#E8F0FE">
+                <svg class="w-4 h-4" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase mb-0.5" style="color:#1B3A5C;opacity:0.4">Date</p>
+                <p class="text-sm font-bold" style="color:#1B3A5C">{{ fmtDate(session.date) }}</p>
+              </div>
             </div>
-            <div class="flex items-center justify-between py-3 border-b" style="border-color:#E8F0FE">
-              <span class="text-sm" style="color:#1B3A5C;opacity:0.7">Time</span>
-              <span class="text-sm font-semibold" style="color:#1B3A5C">{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }} ({{ session.durationMins }} min)</span>
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color:#E8F0FE">
+                <svg class="w-4 h-4" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase mb-0.5" style="color:#1B3A5C;opacity:0.4">Time</p>
+                <p class="text-sm font-bold" style="color:#1B3A5C">
+                  {{ fmtTime(session.startTime) }} – {{ fmtTime(session.endTime) }}
+                  <span class="font-normal" style="color:#1B3A5C;opacity:0.5">· {{ session.durationMins }} mins</span>
+                </p>
+              </div>
             </div>
           </div>
           <div v-if="session.notes" class="p-4 rounded-xl" style="background-color:#F5F7FA">
             <p class="text-xs font-semibold mb-1" style="color:#1B3A5C">Session Notes</p>
             <p class="text-sm" style="color:#1B3A5C;opacity:0.8">{{ session.notes }}</p>
           </div>
-          <div v-if="session.meetingLink&&session.status==='pending'" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
+          <div v-if="session.meetingLink&&session.status==='booked'" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
             <p class="text-xs font-semibold mb-2" style="color:#1B3A5C">Google Meet</p>
             <a :href="session.meetingLink" target="_blank" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90" style="background-color:#2EAA4F">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -202,7 +219,7 @@ onMounted(() => {
   </svg>
   {{ booking ? 'Processing...' : 'Book Session' }}
 </button>
-            <button v-if="session.status==='pending'&&!showCancel&&userRole==='student'" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
+            <button v-if="session.status==='booked'&&!showCancel&&userRole==='student'" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
             <router-link v-if="session.status==='completed'&&userRole==='student'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
           </div>
           <div v-if="showCancel" class="p-5 rounded-xl border" style="border-color:#ef4444;background-color:rgba(239,68,68,0.03)">

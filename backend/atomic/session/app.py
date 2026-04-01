@@ -5,6 +5,7 @@ from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from postgrest.exceptions import APIError
+from datetime import datetime, timezone
 
 
 load_dotenv()
@@ -60,7 +61,7 @@ session_update_model = api.model('SessionUpdate', {
     'tutorSubjectId': fields.String(description='The tutor subject UUID (references TutorSubjects table)', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
     'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
     'endTime': fields.DateTime(description='The session end time', example='2028-03-03T11:00:00.000Z'),
-    'status': fields.String(description='The session status', example='confirmed'),
+    'status': fields.String(description='The session status', example='booked'),
     'durationMins': fields.Float(description='The duration of the session in minutes', example=90),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
     'calendarEventId': fields.String(description='The Google Calendar event ID', example='abc123xyz'),
@@ -147,6 +148,58 @@ class SessionDetail(Resource):
             return {'message': 'Session not found for deletion'}, 404
         except APIError as e:
             return {'message': 'Failed to delete session', 'error': str(e)}, 500
+
+complete_model = api.model('CompleteSession', {
+    'tutorId': fields.String(required=True, description='The tutor UUID — must match the session owner'),
+})
+
+@api.route("/<string:sessionId>/complete")
+class CompleteSession(Resource):
+    @api.expect(complete_model)
+    def post(self, sessionId):
+        """Mark a booked session as completed. Validates tutor ownership and that end time has passed."""
+        data = request.get_json() or {}
+        tutor_id = data.get("tutorId")
+        if not tutor_id:
+            return {"message": "tutorId is required"}, 400
+
+        try:
+            resp = supabase.table('Session').select('*').eq('sessionId', sessionId).execute()
+            if not resp.data:
+                return {"message": "Session not found"}, 404
+            session = resp.data[0]
+        except Exception as e:
+            return {"message": "Failed to retrieve session", "error": str(e)}, 500
+
+        if session.get("tutorId") != tutor_id:
+            return {"message": "You are not authorised to complete this session"}, 403
+
+        if session.get("status") != "booked":
+            return {"message": f"Session cannot be completed — current status is '{session.get('status')}'"}, 409
+
+        end_time_str = session.get("endTime")
+        if not end_time_str:
+            return {"message": "Session has no end time"}, 500
+
+        try:
+            end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+            # Make timezone-aware if naive (Supabase may return without tz)
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=timezone.utc)
+        except Exception:
+            return {"message": "Invalid end time format"}, 500
+
+        if datetime.now(timezone.utc) < end_time:
+            return {"message": "Session cannot be marked complete before it has ended"}, 422
+
+        try:
+            update = supabase.table('Session').update({"status": "completed"}).eq('sessionId', sessionId).execute()
+            if update.data:
+                return update.data[0], 200
+            return {"message": "Failed to update session"}, 500
+        except Exception as e:
+            return {"message": "Failed to update session", "error": str(e)}, 500
+
 
 @api.route("/all")
 class SessionList(Resource):
