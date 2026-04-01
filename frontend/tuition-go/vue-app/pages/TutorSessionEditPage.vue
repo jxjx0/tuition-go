@@ -145,7 +145,7 @@ async function deleteSession() {
               <p class="text-sm mt-1" style="color:rgba(255,255,255,0.75)">{{ session.subjectName }} · {{ session.academicLevel }}</p>
             </div>
             <span class="px-3 py-1 rounded-full text-xs font-semibold mt-1" :style="session.status === 'available' ? 'background-color:rgba(46,170,79,0.2);color:#fff' : 'background-color:rgba(255,255,255,0.2);color:#fff'">
-              {{ session.status === 'available' ? 'Available' : 'Pending' }}
+              {{ session.status === 'available' ? 'Available' : 'Booked' }}
             </span>
           </div>
 

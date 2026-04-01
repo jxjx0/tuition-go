@@ -74,7 +74,7 @@ const isOwner = computed(() =>
 
 const statusLabel = computed(() => { 
   if (!session.value) return ''
-  const m: Record<string, string> = { pending: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled', available: 'Available' }
+  const m: Record<string, string> = { available: 'Available', booked: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled' }
   return m[session.value.status] || session.value.status 
 })
 
@@ -185,7 +185,7 @@ onMounted(() => {
             <p class="text-xs font-semibold mb-1" style="color:#1B3A5C">Session Notes</p>
             <p class="text-sm" style="color:#1B3A5C;opacity:0.8">{{ session.notes }}</p>
           </div>
-          <div v-if="session.meetingLink&&session.status==='pending'" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
+          <div v-if="session.meetingLink&&session.status==='booked'" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
             <p class="text-xs font-semibold mb-2" style="color:#1B3A5C">Google Meet</p>
             <a :href="session.meetingLink" target="_blank" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90" style="background-color:#2EAA4F">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -202,7 +202,7 @@ onMounted(() => {
   </svg>
   {{ booking ? 'Processing...' : 'Book Session' }}
 </button>
-            <button v-if="session.status==='pending'&&!showCancel&&userRole==='student'" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
+            <button v-if="session.status==='booked'&&!showCancel&&userRole==='student'" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
             <router-link v-if="session.status==='completed'&&userRole==='student'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
           </div>
           <div v-if="showCancel" class="p-5 rounded-xl border" style="border-color:#ef4444;background-color:rgba(239,68,68,0.03)">

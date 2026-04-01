@@ -81,7 +81,7 @@ const fetchSessions = async () => {
 }
 
 const upcomingSessions = computed(() => {
-  return sessions.value.filter(s => s.status !== 'completed' && s.status !== 'cancelled')
+  return sessions.value.filter(s => s.status === 'booked')
 })
 
 const pastSessions = computed(() => {

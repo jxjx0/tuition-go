@@ -60,7 +60,7 @@ session_update_model = api.model('SessionUpdate', {
     'tutorSubjectId': fields.String(description='The tutor subject UUID (references TutorSubjects table)', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
     'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
     'endTime': fields.DateTime(description='The session end time', example='2028-03-03T11:00:00.000Z'),
-    'status': fields.String(description='The session status', example='confirmed'),
+    'status': fields.String(description='The session status', example='booked'),
     'durationMins': fields.Float(description='The duration of the session in minutes', example=90),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
     'calendarEventId': fields.String(description='The Google Calendar event ID', example='abc123xyz'),

@@ -104,7 +104,7 @@ const { tutor, searchForTutor } = findTutorById()
 
 const sessions = ref<any[]>([])
 const sessionsLoading = ref(false)
-const sessionTab = ref<'booked' | 'available'>('booked')
+const sessionTab = ref<'booked' | 'pending'>('booked')
 
 async function fetchSessions(id: string) {
   sessionsLoading.value = true
@@ -125,7 +125,7 @@ watch(tutorId, (id) => {
   }
 }, { immediate: true })
 
-const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'pending'))
+const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'booked'))
 const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
 const displayedSessions = computed(() => sessionTab.value === 'booked' ? bookedSessions.value : availableSessions.value)
 
@@ -228,12 +228,12 @@ const tutorStats = [
             <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
                 <img
-                  :src="session.status === 'pending' && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
+                  :src="session.status === 'booked' && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div class="flex-1 min-w-0">
                   <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</h3>
-                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ session.status === 'pending' ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
+                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ session.status === 'booked' ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
                   <div class="flex flex-wrap items-center gap-3 mt-2 text-xs" style="color:#1B3A5C;opacity:0.6">
                     <span>{{ fmtDate(session.startTime) }}</span>
                     <span>{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }}</span>
@@ -242,12 +242,12 @@ const tutorStats = [
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0 items-end">
                   <span v-if="session.totalPrice" class="text-sm font-bold" style="color:#2EAA4F">${{ session.totalPrice.toFixed(2) }}</span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='pending'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='pending'?'Pending':'Available' }}</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='booked'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='booked'?'Booked':'Available' }}</span>
                 </div>
               </div>
             </div>
             <div v-if="!displayedSessions.length" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
-              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No {{ sessionTab === 'booked' ? 'pending' : 'available' }} sessions</p>
+              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No {{ sessionTab === 'booked' ? 'booked' : 'available' }} sessions</p>
             </div>
           </div>
         </div>
