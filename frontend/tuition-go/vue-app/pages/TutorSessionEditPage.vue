@@ -21,6 +21,7 @@ const session = ref<any>(null)
 const loading = ref(true)
 const saving = ref(false)
 const deleting = ref(false)
+const completing = ref(false)
 const error = ref('')
 const saveError = ref('')
 const showDeleteConfirm = ref(false)
@@ -34,6 +35,12 @@ const tutorId = computed(() => {
 
 const isOwner = computed(() => session.value && tutorId.value === session.value.tutorId)
 const isEditable = computed(() => session.value?.status === 'available')
+const isCompletable = computed(() => {
+  if (session.value?.status !== 'booked') return false
+  const endTime = session.value?.endTime
+  if (!endTime) return false
+  return new Date() > new Date(endTime + 'Z')
+})
 
 const form = ref({ tutorSubjectId: '', date: '', startTime: '', endTime: '' })
 
@@ -102,6 +109,21 @@ async function saveSession() {
     saveError.value = err?.response?.data?.message || err?.response?.data?.error || 'Failed to save session'
   } finally {
     saving.value = false
+  }
+}
+
+async function completeSession() {
+  completing.value = true
+  try {
+    await sessionService.completeSession(sessionId, tutorId.value!)
+    const { data: refreshed } = await sessionService.getSessionById(sessionId)
+    session.value = refreshed
+    saved.value = true
+    setTimeout(() => { saved.value = false }, 3000)
+  } catch (err: any) {
+    saveError.value = err?.response?.data?.message || 'Failed to mark session as complete'
+  } finally {
+    completing.value = false
   }
 }
 
@@ -222,14 +244,28 @@ async function deleteSession() {
               </a>
             </div>
 
-            <!-- Booked warning + cancel -->
+            <!-- Booked warning + actions -->
             <div v-if="!isEditable" class="space-y-4">
               <div class="p-4 rounded-xl text-sm font-medium" style="background-color:#FFF8E7;color:#B7791F;border:1px solid #F6E05E">
                 This session has been booked and cannot be edited.
               </div>
-              <div class="flex justify-end pt-2" style="border-top:1px solid #E8F0FE">
+              <p v-if="saveError" class="text-xs" style="color:#E74C3C">{{ saveError }}</p>
+              <div class="flex justify-between items-center pt-2" style="border-top:1px solid #E8F0FE">
                 <button disabled class="px-5 py-2.5 rounded-xl text-sm font-semibold opacity-50 cursor-not-allowed" style="background-color:rgba(231,76,60,0.08);color:#E74C3C">
                   Cancel Session
+                </button>
+                <button
+                  v-if="isCompletable"
+                  @click="completeSession"
+                  :disabled="completing"
+                  class="px-6 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center gap-2"
+                  style="background-color:#2EAA4F"
+                >
+                  <svg v-if="completing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  {{ completing ? 'Saving...' : 'Mark as Complete' }}
                 </button>
               </div>
             </div>

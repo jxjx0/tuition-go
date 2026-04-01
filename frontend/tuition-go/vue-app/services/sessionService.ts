@@ -35,6 +35,10 @@ export function useSessionService() {
       return api.delete(`/delete-session/${sessionId}`)
     },
 
+    completeSession(sessionId: string, tutorId: string) {
+      return api.post(`/sessions/${sessionId}/complete`, { tutorId })
+    },
+
     createSessionWithCalendar(payload: {
       tutorId: string
       tutorSubjectId: string

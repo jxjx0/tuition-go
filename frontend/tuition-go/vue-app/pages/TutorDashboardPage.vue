@@ -99,7 +99,7 @@ const { tutor, searchForTutor } = findTutorById()
 
 const sessions = ref<any[]>([])
 const sessionsLoading = ref(false)
-const sessionTab = ref<'booked' | 'available'>('booked')
+const sessionTab = ref<'booked' | 'available' | 'completed' | 'cancelled'>('booked')
 
 async function fetchSessions(id: string) {
   sessionsLoading.value = true
@@ -122,7 +122,22 @@ watch(tutorId, (id) => {
 
 const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'booked'))
 const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
-const displayedSessions = computed(() => sessionTab.value === 'booked' ? bookedSessions.value : availableSessions.value)
+const completedSessions = computed(() => sessions.value.filter(s => s.status === 'completed'))
+const cancelledSessions = computed(() => sessions.value.filter(s => s.status === 'cancelled'))
+
+const sessionTabs = computed(() => [
+  { key: 'booked',     label: 'Booked',     count: bookedSessions.value.length },
+  { key: 'available',  label: 'Available',  count: availableSessions.value.length },
+  { key: 'completed',  label: 'Completed',  count: completedSessions.value.length },
+  { key: 'cancelled',  label: 'Cancelled',  count: cancelledSessions.value.length },
+])
+
+const displayedSessions = computed(() => {
+  if (sessionTab.value === 'booked') return bookedSessions.value
+  if (sessionTab.value === 'available') return availableSessions.value
+  if (sessionTab.value === 'completed') return completedSessions.value
+  return cancelledSessions.value
+})
 
 const tutorReviews = computed(() => {
   if (!tutorId.value) return []
@@ -219,16 +234,11 @@ const tutorStats = [
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-bold" style="color:#1B3A5C">Sessions</h2>
-            <div class="flex gap-1 p-1 rounded-xl" style="background-color:#E8F0FE">
-              <button @click="sessionTab='booked'" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all" :style="sessionTab==='booked'?'background-color:#fff;color:#1B3A5C;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.5'">
-                Booked <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs" style="background-color:#4A90D9;color:#fff">{{ bookedSessions.length }}</span>
-              </button>
-              <button @click="sessionTab='available'" class="px-4 py-1.5 rounded-lg text-xs font-semibold transition-all" :style="sessionTab==='available'?'background-color:#fff;color:#1B3A5C;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.5'">
-                Available <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs" style="background-color:#2EAA4F;color:#fff">{{ availableSessions.length }}</span>
-              </button>
-            </div>
+          <h2 class="text-lg font-bold mb-4" style="color:#1B3A5C">Sessions</h2>
+          <div class="flex items-center gap-1 p-1 rounded-xl mb-6" style="background-color:#E8F0FE">
+            <button v-for="tab in sessionTabs" :key="tab.key" @click="sessionTab = tab.key as any" class="flex-1 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all" :style="sessionTab===tab.key?'background-color:#fff;color:#4A90D9;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.7'">
+              {{ tab.label }} ({{ tab.count }})
+            </button>
           </div>
           <div v-if="sessionsLoading" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
             <svg class="animate-spin w-6 h-6 mx-auto" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
@@ -237,7 +247,7 @@ const tutorStats = [
             </svg>
           </div>
           <div v-else class="space-y-3">
-            <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
+            <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" :class="session.status==='cancelled'?'opacity-60':''" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
                 <img
                   :src="session.status === 'booked' && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
@@ -260,7 +270,7 @@ const tutorStats = [
               </div>
             </div>
             <div v-if="!displayedSessions.length" class="text-center py-12 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
-              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No {{ sessionTab === 'booked' ? 'booked' : 'available' }} sessions</p>
+              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No {{ sessionTab }} sessions</p>
             </div>
           </div>
         </div>
