@@ -45,5 +45,18 @@ export function useSessionService() {
     }) {
       return api.post('/sessions/session', payload)
     },
+
+    /**
+     * Cancel a booked session.
+     * Triggers the cancel-session composite service which handles:
+     * session status update → Stripe refund → slot restoration → calendar update.
+     */
+    cancelSession(sessionId: string, studentId: string) {
+      return api.post('/cancel-session/cancel', {
+        session_id: sessionId,
+        student_id: studentId,
+      })
+    },
   }
 }
+

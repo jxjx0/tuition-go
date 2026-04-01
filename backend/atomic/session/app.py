@@ -40,6 +40,7 @@ session_model = api.model('Session', {
     'durationMins': fields.Float(description='The duration of the session in minutes'),
     'meetingLink': fields.String(description='The meeting link'),
     'calendarEventId': fields.String(description='The Google Calendar event ID'),
+    'stripeSessionId': fields.String(description='The Stripe Checkout Session ID for refund tracking'),
     'createdAt': fields.DateTime(description='The creation timestamp'),
     'updatedAt': fields.DateTime(description='The last update timestamp')
 })
@@ -61,9 +62,11 @@ session_update_model = api.model('SessionUpdate', {
     'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
     'endTime': fields.DateTime(description='The session end time', example='2028-03-03T11:00:00.000Z'),
     'status': fields.String(description='The session status', example='confirmed'),
+    'studentId': fields.String(description='The student UUID — set to null to clear', example='b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'),
     'durationMins': fields.Float(description='The duration of the session in minutes', example=90),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
     'calendarEventId': fields.String(description='The Google Calendar event ID', example='abc123xyz'),
+    'stripeSessionId': fields.String(description='The Stripe Checkout Session ID for refund tracking', example='cs_test_abc123'),
 })
 
 

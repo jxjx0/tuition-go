@@ -39,6 +39,12 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const sessionService = useSessionService()
 
+// Cancel state
+const showCancelId = ref<string | null>(null)   // which session's confirm dialog is open
+const cancellingId = ref<string | null>(null)    // which session is being cancelled right now
+const cancelError  = ref<string | null>(null)    // error message from backend
+const cancelSuccess = ref<boolean>(false)         // show success toast/banner
+
 const fetchSessions = async () => {
   if (!currentStudentId.value) {
     sessions.value = []
@@ -101,6 +107,23 @@ watch(
   },
   { immediate: true }
 )
+
+async function cancelSession(sessionId: string) {
+  if (!currentStudentId.value) return
+  cancellingId.value = sessionId
+  cancelError.value = null
+  try {
+    await sessionService.cancelSession(sessionId, currentStudentId.value)
+    showCancelId.value = null
+    cancelSuccess.value = true
+    setTimeout(() => { cancelSuccess.value = false }, 5000)
+    await fetchSessions()   // refresh the list
+  } catch (err: any) {
+    cancelError.value = err.response?.data?.message || 'Failed to cancel. Please try again.'
+  } finally {
+    cancellingId.value = null
+  }
+}
 
 const tabs = computed(() => [
   { key: 'upcoming', label: 'Upcoming', count: upcomingSessions.value.length },
@@ -171,6 +194,27 @@ const dashStats = computed(() => {
         <div class="flex items-center gap-1 p-1 rounded-xl mb-6" style="background-color:#E8F0FE">
           <button v-for="tab in tabs" :key="tab.key" @click="activeTab=tab.key" class="flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all" :style="activeTab===tab.key?'background-color:#fff;color:#4A90D9;box-shadow:0 1px 3px rgba(0,0,0,0.08)':'color:#1B3A5C;opacity:0.7'">{{ tab.label }} ({{ tab.count }})</button>
         </div>
+
+        <!-- Global Success Banner for Cancellation -->
+        <transition name="slide-up">
+          <div v-if="cancelSuccess" class="mb-6 rounded-2xl border-l-4 border-emerald-500 bg-emerald-50 p-6 shadow-md flex items-center gap-4">
+            <div class="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-emerald-900 font-bold">Cancellation Successful</h3>
+              <p class="text-emerald-700 text-sm">Your session has been cancelled and a full refund has been initiated via Stripe.</p>
+            </div>
+            <button @click="cancelSuccess = false" class="ml-auto text-emerald-500 hover:text-emerald-700">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </transition>
+
       <div v-if="activeTab==='upcoming'" class="space-y-4">
         <div v-for="session in upcomingSessions" :key="session.id" class="rounded-2xl border p-5 hover:shadow-sm" style="background-color:#fff;border-color:#E8F0FE">
           <div class="flex flex-col sm:flex-row items-start gap-4">
@@ -191,6 +235,37 @@ const dashStats = computed(() => {
             <div class="flex flex-row sm:flex-col gap-2 flex-shrink-0">
               <a v-if="session.meetingLink" :href="session.meetingLink" target="_blank" class="px-4 py-2 rounded-xl text-xs font-semibold text-white text-center hover:opacity-90" style="background-color:#2EAA4F">Join Meeting</a>
               <router-link :to="'/session/'+session.id" class="px-4 py-2 rounded-xl text-xs font-semibold text-center border hover:bg-gray-50" style="border-color:#E8F0FE;color:#4A90D9">Details</router-link>
+              <button
+                @click="showCancelId = session.id; cancelError = null"
+                class="px-4 py-2 rounded-xl text-xs font-semibold border hover:bg-red-50"
+                style="border-color:#ef4444;color:#ef4444"
+              >Cancel</button>
+            </div>
+          </div>
+          <!-- Inline cancel confirmation for this card -->
+          <div v-if="showCancelId === session.id" class="mt-3 p-4 rounded-xl border" style="border-color:#ef4444;background-color:rgba(239,68,68,0.03)">
+            <p class="text-xs font-bold mb-1" style="color:#ef4444">Cancel this session?</p>
+            <p class="text-xs mb-3" style="color:#1B3A5C;opacity:0.7">Cancellation must be made at least 2 hours in advance. A full refund will be issued within 3–5 business days.</p>
+            <div v-if="cancelError && cancellingId === null && showCancelId === session.id" class="mb-2 p-2 rounded-lg text-xs font-medium" style="background-color:rgba(239,68,68,0.08);color:#ef4444">{{ cancelError }}</div>
+            <div class="flex gap-2">
+              <button
+                @click="cancelSession(session.id)"
+                :disabled="cancellingId === session.id"
+                class="px-4 py-2 rounded-xl text-xs font-semibold text-white flex items-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
+                style="background-color:#ef4444"
+              >
+                <svg v-if="cancellingId === session.id" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                {{ cancellingId === session.id ? 'Cancelling...' : 'Yes, Cancel' }}
+              </button>
+              <button
+                @click="showCancelId = null; cancelError = null"
+                :disabled="cancellingId === session.id"
+                class="px-4 py-2 rounded-xl text-xs font-semibold border disabled:opacity-60"
+                style="border-color:#E8F0FE;color:#1B3A5C"
+              >Keep</button>
             </div>
           </div>
         </div>

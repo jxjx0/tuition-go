@@ -33,7 +33,7 @@ const tutorId = computed(() => {
 })
 
 const isOwner = computed(() => session.value && tutorId.value === session.value.tutorId)
-const isEditable = computed(() => session.value?.status === 'available')
+const isEditable = computed(() => (session.value?.status || '').toLowerCase() === 'available')
 
 const form = ref({ tutorSubjectId: '', date: '', startTime: '', endTime: '' })
 
@@ -144,8 +144,8 @@ async function deleteSession() {
               <h1 class="text-2xl font-extrabold text-white">Session Details</h1>
               <p class="text-sm mt-1" style="color:rgba(255,255,255,0.75)">{{ session.subjectName }} · {{ session.academicLevel }}</p>
             </div>
-            <span class="px-3 py-1 rounded-full text-xs font-semibold mt-1" :style="session.status === 'available' ? 'background-color:rgba(46,170,79,0.2);color:#fff' : 'background-color:rgba(255,255,255,0.2);color:#fff'">
-              {{ session.status === 'available' ? 'Available' : 'Pending' }}
+            <span class="px-3 py-1 rounded-full text-xs font-semibold mt-1" :style="isEditable ? 'background-color:rgba(46,170,79,0.2);color:#fff' : 'background-color:rgba(46,170,79,0.2);color:#fff'">
+              {{ isEditable ? 'Available' : 'Booked' }}
             </span>
           </div>
 

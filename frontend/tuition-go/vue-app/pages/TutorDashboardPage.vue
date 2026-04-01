@@ -125,8 +125,18 @@ watch(tutorId, (id) => {
   }
 }, { immediate: true })
 
-const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'pending'))
-const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
+function isBookedSession(session: any) {
+  const st = (session.status || '').toLowerCase()
+  return st === 'pending' || st === 'booked' || st === 'confirmed'
+}
+
+function isAvailableSession(session: any) {
+  const st = (session.status || '').toLowerCase()
+  return st === 'available'
+}
+
+const bookedSessions = computed(() => sessions.value.filter(isBookedSession))
+const availableSessions = computed(() => sessions.value.filter(isAvailableSession))
 const displayedSessions = computed(() => sessionTab.value === 'booked' ? bookedSessions.value : availableSessions.value)
 
 const tutorReviews = computed(() => {
@@ -228,12 +238,12 @@ const tutorStats = [
             <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
                 <img
-                  :src="session.status === 'pending' && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
+                  :src="isBookedSession(session) && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div class="flex-1 min-w-0">
                   <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</h3>
-                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ session.status === 'pending' ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
+                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ isBookedSession(session) ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
                   <div class="flex flex-wrap items-center gap-3 mt-2 text-xs" style="color:#1B3A5C;opacity:0.6">
                     <span>{{ fmtDate(session.startTime) }}</span>
                     <span>{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }}</span>
@@ -242,7 +252,7 @@ const tutorStats = [
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0 items-end">
                   <span v-if="session.totalPrice" class="text-sm font-bold" style="color:#2EAA4F">${{ session.totalPrice.toFixed(2) }}</span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='pending'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='pending'?'Pending':'Available' }}</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="isBookedSession(session)?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ isBookedSession(session)?'Booked':'Available' }}</span>
                 </div>
               </div>
             </div>
@@ -262,7 +272,7 @@ const tutorStats = [
                   <StarRating :modelValue="review.rating" size="sm"/>
                 </div>
               </div>
-              <p class="text-xs leading-relaxed" style="color:#1B3A5C;opacity:0.75;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ review.comment }}</p>
+              <p class="text-xs leading-relaxed" style="color:#1B3A5C;opacity:0.75;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ review.comment }}</p>
               <p class="text-xs mt-2" style="color:#1B3A5C;opacity:0.45">{{ review.subject }} &middot; {{ fmtDate(review.createdAt) }}</p>
             </div>
             <div v-if="!tutorReviews.length" class="text-center py-8 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">

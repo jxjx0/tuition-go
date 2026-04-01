@@ -93,11 +93,16 @@ class ProcessBooking(Resource):
         if not student_email:
             return {"message": "Student email not found"}, 500
 
-        # 4. Update session status to booked and assign student
+        # 4. Update session status to booked, assign student, and store Stripe session ID for future refunds
         student_id = data.get("student_id")
+        stripe_session_id = data.get("stripe_session_id")
+        update_payload = {"status": "booked", "studentId": student_id}
+        if stripe_session_id:
+            update_payload["stripeSessionId"] = stripe_session_id
+
         update_resp = requests.put(
             f"{SESSION_SERVICE_URL}/session/{session_id}",
-            json={"status": "booked", "studentId": student_id},
+            json=update_payload,
             headers={"Authorization": auth_header},
             timeout=5
         )
@@ -132,6 +137,10 @@ class ProcessBooking(Resource):
         return {
             "message": "Booking confirmed and calendar updated",
             "session_id": session_id,
+            "student_id": student_id,
+            "tutor_id":   tutor_id,
+            "amount_total": data.get("amount_total"),
+            "stripe_session_id": stripe_session_id,
             "student_email": student_email
         }, 200
 
