@@ -500,6 +500,24 @@ Placeholder — no active endpoints.
 |--------|------|-------------|
 | `POST` | `/checkout/checkout` | Validate session + calculate price + create Stripe checkout URL |
 
+**Input**:
+```json
+{
+  "session_id": "uuid",
+  "student_id": "uuid"
+}
+```
+
+**Output** `200`:
+```json
+{
+  "url": "https://checkout.stripe.com/pay/cs_live_...",
+  "id":  "cs_live_..."
+}
+```
+
+**Errors**: `400` missing fields · `404` session or subject not found · `500` downstream failure
+
 Calls: Session → Tutor → Payment
 
 ---
@@ -510,7 +528,41 @@ Calls: Session → Tutor → Payment
 |--------|------|-------------|
 | `POST` | `/process-booking/process-booking` | Confirm payment + mark session booked + send calendar invite to student |
 
-Calls: Payment → Session → Student → Tutor → Calendar
+**Input**:
+```json
+{
+  "stripe_session_id": "cs_live_..."
+}
+```
+
+**Output** `200`:
+```json
+{
+  "message": "Booking confirmed and calendar updated",
+  "sessionId": "uuid",
+  "student_email": "student@example.com",
+  "student_name": "John Doe",
+  "tutor_name": "Alice Smith",
+  "amount_paid": 3500,
+  "start_time": "2026-04-10T14:00:00",
+  "end_time": "2026-04-10T15:00:00",
+  "subject": "Mathematics",
+  "status": "booked"
+}
+```
+
+**Output** `207` (calendar update failed, booking still confirmed):
+```json
+{
+  "message": "Booking confirmed but calendar update failed",
+  "calendarError": "...",
+  ...same fields as 200...
+}
+```
+
+**Errors**: `400` missing field · `401` invalid JWT · `402` payment not completed · `500` downstream failure
+
+Calls: Payment → Session → Tutor → Student → Calendar
 
 ---
 
@@ -519,6 +571,45 @@ Calls: Payment → Session → Student → Tutor → Calendar
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/create-session/create-session` | Create session record + Google Calendar event + link them |
+
+**Input**:
+```json
+{
+  "tutorId":        "uuid",
+  "tutorSubjectId": "uuid",
+  "startTime":      "2026-04-10T14:00:00",
+  "endTime":        "2026-04-10T15:00:00",
+  "durationMins":   60,
+  "summary":        "Mathematics (A-Level)",
+  "timezone":       "Asia/Singapore"
+}
+```
+
+**Output** `201`:
+```json
+{
+  "sessionId":       "uuid",
+  "tutorId":         "uuid",
+  "tutorSubjectId":  "uuid",
+  "startTime":       "2026-04-10T14:00:00",
+  "endTime":         "2026-04-10T15:00:00",
+  "durationMins":    60,
+  "status":          "available",
+  "calendarEventId": "google_event_id",
+  "meetingLink":     "https://meet.google.com/abc-def-ghi"
+}
+```
+
+**Output** `207` (session created, calendar failed):
+```json
+{
+  "message": "Session created but calendar event failed",
+  "session": { ... },
+  "calendarError": "..."
+}
+```
+
+**Errors**: `400` missing fields · `401` invalid JWT · `409` overlapping session exists
 
 Calls: Session → Calendar → Session (patch)
 
@@ -530,6 +621,31 @@ Calls: Session → Calendar → Session (patch)
 |--------|------|-------------|
 | `PUT` | `/update-session/<sessionId>` | Update session times/subject + sync calendar. Blocked if status is `booked` |
 
+**Input**:
+```json
+{
+  "tutorSubjectId": "uuid",
+  "startTime":      "2026-04-10T15:00:00",
+  "endTime":        "2026-04-10T16:00:00",
+  "durationMins":   60,
+  "summary":        "Physics (A-Level)",
+  "timezone":       "Asia/Singapore"
+}
+```
+
+**Output** `200`: Updated session object (same shape as Create Session output)
+
+**Output** `207` (session updated, calendar sync failed):
+```json
+{
+  "message": "Session updated but calendar sync failed",
+  "session": { ... },
+  "calendarError": "..."
+}
+```
+
+**Errors**: `400` missing fields · `401` invalid JWT · `404` session not found · `409` session is already booked
+
 Calls: Session (read) → Session (update) → Tutor → Calendar
 
 ---
@@ -539,6 +655,25 @@ Calls: Session (read) → Session (update) → Tutor → Calendar
 | Method | Path | Description |
 |--------|------|-------------|
 | `DELETE` | `/delete-session/<sessionId>` | Delete session record + remove calendar event. Blocked if status is `booked` |
+
+**Input**: None (sessionId in path)
+
+**Output** `200`:
+```json
+{
+  "message": "Session and calendar event deleted successfully"
+}
+```
+
+**Output** `207` (session deleted, calendar cleanup failed):
+```json
+{
+  "message": "Session deleted but calendar event cleanup failed",
+  "calendarError": "..."
+}
+```
+
+**Errors**: `401` invalid JWT · `404` session not found · `409` session is already booked
 
 Calls: Session (read) → Session (delete) → Tutor → Calendar
 
@@ -560,6 +695,32 @@ Retrieves sessions enriched with tutor/student details and calculated pricing.
 | `GET`  | `/getsessions/tutor/<tutorId>/sessions` | All sessions for a tutor (includes student info) |
 | `GET`  | `/getsessions/session/<sessionId>` | Single session (fully enriched) |
 
+**Input**: ID in path only, no body
+
+**Output** `200` (array for student/tutor endpoints, single object for session endpoint):
+```json
+{
+  "sessionId":      "uuid",
+  "tutorId":        "uuid",
+  "studentId":      "uuid",
+  "tutorSubjectId": "uuid",
+  "startTime":      "2026-04-10T14:00:00",
+  "endTime":        "2026-04-10T15:00:00",
+  "durationMins":   60,
+  "status":         "booked",
+  "meetingLink":    "https://meet.google.com/abc-def-ghi",
+  "tutorName":      "Alice Smith",
+  "tutorImageUrl":  "https://...",
+  "subjectName":    "Mathematics",
+  "academicLevel":  "A-Level",
+  "totalPrice":     35.00,
+  "studentName":    "John Doe",       // tutor + single endpoints only
+  "studentImageUrl":"https://..."     // tutor + single endpoints only
+}
+```
+
+**Errors**: `404` no sessions found · `500` downstream failure
+
 Calls: Session → Tutor → Student (tutor/single endpoints only)
 
 ---
@@ -570,6 +731,36 @@ Calls: Session → Tutor → Student (tutor/single endpoints only)
 |--------|------|-------------|
 | `POST` | `/rate-tutor/review` | Validate session, prevent duplicates, submit review, update tutor rating |
 
+**Input**:
+```json
+{
+  "session_id": "uuid",
+  "tutor_id":   "uuid",
+  "rating":     5,
+  "comment":    "Excellent session!"
+}
+```
+
+**Output** `200`:
+```json
+{
+  "message": "Review submitted and tutor rating updated",
+  "review": { "review_id": 1712345678000, ... },
+  "tutorRating": { "averageRating": 4.8, "totalReviews": 12 }
+}
+```
+
+**Output** `207` (review saved, rating update failed):
+```json
+{
+  "message": "Review submitted but tutor rating update failed",
+  "review": { ... },
+  "ratingError": "..."
+}
+```
+
+**Errors**: `400` missing/invalid fields · `404` session not found · `409` already reviewed this session · `500` OutSystems failure
+
 Calls: Session → OutSystems (read check) → OutSystems (write) → Tutor (update rating)
 
 ---
@@ -579,6 +770,38 @@ Calls: Session → OutSystems (read check) → OutSystems (write) → Tutor (upd
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/get-tutor/<tutorId>` | Return tutor profile with enriched reviews (student name + avatar attached) |
+
+**Input**: `tutorId` in path only, no body
+
+**Output** `200`:
+```json
+{
+  "tutorId":       "uuid",
+  "name":          "Alice Smith",
+  "imageURL":      "https://...",
+  "bio":           "...",
+  "averageRating": 4.8,
+  "totalReviews":  12,
+  "subjects": [
+    { "tutorSubjectId": "uuid", "subject": "Mathematics", "academicLevel": "A-Level", "hourlyRate": 35 }
+  ],
+  "reviews": [
+    {
+      "review_id":     1712345678000,
+      "session_id":    "uuid",
+      "tutor_id":      "uuid",
+      "student_id":    "uuid",
+      "rating":        5,
+      "comment":       "Excellent session!",
+      "createdAt":     "2026-04-02T10:30:00.000000Z",
+      "studentName":   "John Doe",
+      "studentAvatar": "https://..."
+    }
+  ]
+}
+```
+
+**Errors**: `404` tutor not found · `500` downstream failure
 
 Calls: Tutor → OutSystems → Student (per reviewer)
 
