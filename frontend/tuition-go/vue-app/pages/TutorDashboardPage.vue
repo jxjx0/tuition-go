@@ -130,9 +130,30 @@ function isAvailableSession(session: any) {
   return st === 'available'
 }
 
+function isCompletedSession(session: any) {
+  const st = (session.status || '').toLowerCase()
+  return st === 'completed'
+}
+
+function isCancelledSession(session: any) {
+  const st = (session.status || '').toLowerCase()
+  return st === 'cancelled'
+}
+
 const bookedSessions = computed(() => sessions.value.filter(isBookedSession))
 const availableSessions = computed(() => sessions.value.filter(isAvailableSession))
-const displayedSessions = computed(() => sessionTab.value === 'booked' ? bookedSessions.value : availableSessions.value)
+const completedSessions = computed(() => sessions.value.filter(isCompletedSession))
+const cancelledSessions = computed(() => sessions.value.filter(isCancelledSession))
+
+const sessionTabs = computed(() => [
+  { key: 'booked', label: 'Booked', count: bookedSessions.value.length },
+  { key: 'available', label: 'Available', count: availableSessions.value.length },
+])
+
+const displayedSessions = computed(() => {
+  if (sessionTab.value === 'available') return availableSessions.value
+  return bookedSessions.value
+})
 
 const tutorReviews = computed(() => {
   if (!tutorId.value) return []

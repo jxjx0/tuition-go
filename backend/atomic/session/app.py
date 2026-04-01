@@ -131,13 +131,33 @@ class SessionDetail(Resource):
     @api.expect(session_update_model)
     @api.marshal_with(session_model)
     def put(self, sessionId):
-        """Update a session record."""
+        """Update a session record. Null values are explicitly applied (e.g. to clear studentId)."""
         data = request.get_json()
         try:
-            response = supabase.table('Session').update(data).eq('sessionId', sessionId).execute()
-            if response.data:
-                return response.data[0], 200
-            return {'message': 'Session not found for update'}, 404
+            # Supabase Python client skips None values in .update(), so we must
+            # separate the payload: non-null fields are updated normally, and
+            # null fields are explicitly set via a second update call.
+            non_null = {k: v for k, v in data.items() if v is not None}
+            null_keys = [k for k, v in data.items() if v is None]
+
+            # Apply non-null updates first (or all fields if no nulls)
+            if non_null:
+                response = supabase.table('Session').update(non_null).eq('sessionId', sessionId).execute()
+                if not response.data:
+                    return {'message': 'Session not found for update'}, 404
+
+            # Explicitly clear null fields using a raw dict with None preserved
+            if null_keys:
+                null_payload = {k: None for k in null_keys}
+                response = supabase.table('Session').update(null_payload).eq('sessionId', sessionId).execute()
+                if not response.data:
+                    return {'message': 'Session not found when clearing fields'}, 404
+
+            # Return the latest state
+            final = supabase.table('Session').select('*').eq('sessionId', sessionId).execute()
+            if final.data:
+                return final.data[0], 200
+            return {'message': 'Session not found after update'}, 404
         except Exception as e:
             return {'message': 'Failed to update session', 'error': str(e)}, 500
 
