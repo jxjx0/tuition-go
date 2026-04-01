@@ -125,6 +125,11 @@ services:
 
   - name: checkout-service
     url: http://checkout:5100/checkout
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: checkout-route
         paths: [/api/v1/checkout]
@@ -133,14 +138,63 @@ services:
 
   - name: process-booking-service
     url: http://process-booking:5104/process-booking
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: process-booking-route
         paths: [/api/v1/process-booking]
         methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
+  - name: create-session-service
+    url: http://create-session:5105/create-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: create-session-route
+        paths: [/api/v1/create-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
+  - name: update-session-service
+    url: http://update-session:5106/update-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: update-session-route
+        paths: [/api/v1/update-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
+  - name: delete-session-service
+    url: http://delete-session:5107/delete-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: delete-session-route
+        paths: [/api/v1/delete-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
   - name: cancel-session-service
     url: http://cancel-session:5101/cancel-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: cancel-session-route
         paths: [/api/v1/cancel-session]
@@ -149,6 +203,11 @@ services:
 
   - name: rate-tutor-service
     url: http://rate-tutor:5102/rate-tutor
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: rate-tutor-route
         paths: [/api/v1/rate-tutor]
@@ -157,6 +216,11 @@ services:
 
   - name: get-sessions-service
     url: http://get-sessions:5103/getsessions
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: get-sessions-route
         paths: [/api/v1/getsessions/]
