@@ -21,6 +21,7 @@ services:
       - payment
       - checkout
       - process-booking
+      - create-session
       - cancel-session
       - rate-tutor
       - get-sessions
@@ -174,6 +175,20 @@ services:
       - STUDENT_SERVICE_URL=http://student:5001
       - CALENDAR_SERVICE_URL=http://calendar:5005
       - PAYMENT_SERVICE_URL=http://payment:5007
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  create-session:
+    build:
+      context: ./composite/create_session
+      dockerfile: Dockerfile
+    container_name: create-session-service
+    ports:
+      - "5105:5105"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - CALENDAR_SERVICE_URL=http://calendar:5005
     networks:
       - tuition-network
     restart: unless-stopped

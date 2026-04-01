@@ -16,6 +16,7 @@ SERVICES = {
     "/api/v1/calendar": "http://localhost:5005/calendar",
     "/api/v1/emails": "http://localhost:5006/email",
     "/api/v1/payments": "http://localhost:5007/payment",
+    "/api/v1/create-session": "http://localhost:5105/create-session",
     "/api/v1/book-session": "http://localhost:5100/book-session",
     "/api/v1/cancel-session": "http://localhost:5101/cancel-session",
     "/api/v1/rate-tutor": "http://localhost:5102/rate-tutor",

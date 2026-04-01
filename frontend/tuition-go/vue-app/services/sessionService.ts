@@ -45,5 +45,17 @@ export function useSessionService() {
     }) {
       return api.post('/sessions/session', payload)
     },
+
+    createSessionWithCalendar(payload: {
+      tutorId: string
+      tutorSubjectId: string
+      startTime: string
+      endTime: string
+      durationMins: number
+      summary: string
+      timezone: string
+    }) {
+      return api.post('/create-session/create-session', payload)
+    },
   }
 }

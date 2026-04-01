@@ -2,7 +2,6 @@
 import { ref, computed, watch } from 'vue'
 import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
-import { useMeeting } from '../composables/useMeeting'
 import { mockReviews } from '../composables/useMockData'
 import { findTutorById } from "../composables/useTutors"
 import { useSessionService } from '../services/sessionService'
@@ -20,7 +19,6 @@ function fmtTime(d: string) {
 }
 
 const { user } = useUser()
-const { createMeeting } = useMeeting()
 
 const showCreateSlot = ref(false)
 
@@ -49,48 +47,22 @@ async function handleCreateSlot() {
 
   slotCreating.value = true
   try {
-    // 1. Create the session slot
-    const { data: newSession } = await sessionService.createSession({
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    await sessionService.createSessionWithCalendar({
       tutorId: tutorId.value!,
       tutorSubjectId: slotForm.value.tutorSubjectId,
       startTime,
       endTime,
-      status: 'available',
       durationMins,
+      summary: subjectLabel,
+      timezone: tz,
     })
-
-    // 2. Create the Google Calendar event on the tutor's calendar
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
-      const meetingResult = await createMeeting({
-        summary: subjectLabel,
-        description: 'Tuition session created via TuitionGo.',
-        start_time: startTime,
-        end_time: endTime,
-        timezone: tz,
-        attendees: []
-      })
-
-      // 3. Save calendarEventId and meetingLink back to the session record
-      if (meetingResult?.eventId && newSession?.sessionId) {
-        try {
-          await sessionService.updateSession(newSession.sessionId, {
-            calendarEventId: meetingResult.eventId,
-            meetingLink: meetingResult.hangoutLink,
-          })
-        } catch (updateErr) {
-          console.warn('Session created but failed to save calendarEventId:', updateErr)
-        }
-      }
-    } catch (calendarErr) {
-      console.warn('Session created but calendar event failed:', calendarErr)
-    }
 
     slotForm.value = { tutorSubjectId: '', date: '', startTime: '', endTime: '' }
     showCreateSlot.value = false
     if (tutorId.value) fetchSessions(tutorId.value)
   } catch (err: any) {
-    slotError.value = err?.response?.data?.error || 'Failed to create session slot'
+    slotError.value = err?.response?.data?.message || err?.response?.data?.error || 'Failed to create session slot'
   } finally {
     slotCreating.value = false
   }
@@ -104,7 +76,7 @@ const { tutor, searchForTutor } = findTutorById()
 
 const sessions = ref<any[]>([])
 const sessionsLoading = ref(false)
-const sessionTab = ref<'booked' | 'pending'>('booked')
+const sessionTab = ref<'booked' | 'available'>('booked')
 
 async function fetchSessions(id: string) {
   sessionsLoading.value = true
