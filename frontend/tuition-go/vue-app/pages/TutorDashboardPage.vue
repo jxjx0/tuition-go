@@ -5,6 +5,7 @@ import { StarRating } from '../components'
 import { findTutorById } from "../composables/useTutors"
 import { useSessionService } from '../services/sessionService'
 import { useApi } from '../services/api'
+import { avatarUrl } from '../utils/avatar'
 
 function toUtcDate(d: string) {
   return new Date(d + 'Z')
@@ -258,7 +259,7 @@ const tutorStats = computed(() => [
             <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" :class="session.status==='cancelled'?'opacity-60':''" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
                 <img
-                  :src="session.status === 'booked' && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
+                  :src="avatarUrl(session.status === 'booked' ? session.studentImageUrl : null, session.studentId || 'default')"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div class="flex-1 min-w-0">
@@ -287,7 +288,7 @@ const tutorStats = computed(() => [
           <div class="space-y-3">
             <div v-for="review in tutorReviews" :key="review.review_id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
               <div class="flex items-center gap-2 mb-2">
-                <img :src="review.studentAvatar || 'https://api.dicebear.com/9.x/notionists/svg?seed=' + review.student_id" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
+                <img :src="avatarUrl(review.studentAvatar, review.student_id)" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
                 <div class="flex-1 min-w-0">
                   <p class="text-xs font-semibold" style="color:#1B3A5C">{{ review.studentName || 'Anonymous' }}</p>
                   <StarRating :modelValue="review.rating" size="sm"/>

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUser } from '@clerk/vue'
 import { useSessionService } from '../services/sessionService'
 import { findTutorById } from '../composables/useTutors'
+import { avatarUrl } from '../utils/avatar'
 
 const route = useRoute()
 const router = useRouter()
@@ -248,7 +249,7 @@ async function deleteSession() {
               <!-- Student -->
               <div v-if="session.studentName" class="flex items-center gap-4 p-4 rounded-xl" style="background-color:#F5F7FA;border:1px solid #E8F0FE">
                 <img
-                  :src="session.studentImageUrl || 'https://api.dicebear.com/9.x/notionists/svg?seed=' + session.studentId"
+                  :src="avatarUrl(session.studentImageUrl, session.studentId)"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div>

@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { StarRating } from "../components";
 import { useSessionService } from "../services/sessionService";
 import { useApi } from "../services/api";
+import { avatarUrl } from "../utils/avatar";
 
 function fmtDate(d: string) {
   return new Date(d + 'Z').toLocaleDateString("en-SG", {
@@ -132,7 +133,7 @@ async function submitReview() {
           <!-- Session summary -->
           <div class="flex items-center gap-4 p-4 rounded-xl" style="background-color: #f5f7fa">
             <img
-              :src="session.tutorImageUrl || 'https://api.dicebear.com/9.x/notionists/svg?seed=' + session.tutorId"
+              :src="avatarUrl(session.tutorImageUrl, session.tutorId)"
               :alt="session.tutorName"
               class="w-14 h-14 rounded-xl object-cover"
               crossorigin="anonymous"

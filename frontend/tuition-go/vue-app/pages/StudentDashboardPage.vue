@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useUser } from '@clerk/vue'
 import { useSessionService } from '../services/sessionService'
+import { avatarUrl } from '../utils/avatar'
 
 interface Session {
   id: string
@@ -55,7 +56,7 @@ const fetchSessions = async () => {
     sessions.value = data.map((session: any) => ({
       id: session.sessionId,
       tutorName: session.tutorName || 'Unknown Tutor',
-      tutorAvatar: session.tutorImageUrl || 'https://via.placeholder.com/56',
+      tutorAvatar: avatarUrl(session.tutorImageUrl, session.tutorId),
       subject: session.subjectName || 'Unknown Subject',
       level: session.academicLevel || 'Unknown',
       date: session.startTime,
