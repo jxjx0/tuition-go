@@ -29,6 +29,7 @@ const error = ref("");
 const loadError = ref("");
 const session = ref<any>(null);
 const loading = ref(true);
+const alreadyReviewed = ref(false);
 
 const ratingLabel = computed(() => {
   const l: Record<number, string> = { 1: "Poor", 2: "Fair", 3: "Good", 4: "Very Good", 5: "Excellent" };
@@ -43,6 +44,17 @@ onMounted(async () => {
       return
     }
     session.value = data
+
+    // Check for duplicate review
+    try {
+      const { data: tutorData } = await api.get(`/get-tutor/${data.tutorId}`)
+      const reviews: any[] = tutorData?.reviews ?? []
+      if (reviews.some((r: any) => r.session_id === sessionId)) {
+        alreadyReviewed.value = true
+      }
+    } catch {
+      // Non-fatal: if check fails, still show form
+    }
   } catch {
     loadError.value = "Session not found."
   } finally {
@@ -94,6 +106,20 @@ async function submitReview() {
       <div v-else-if="loadError" class="text-center py-20 rounded-2xl border p-8" style="background-color:#fff;border-color:#E8F0FE">
         <p class="text-base font-semibold mb-4" style="color:#E74C3C">{{ loadError }}</p>
         <router-link to="/dashboard" class="inline-block px-6 py-2 rounded-xl text-sm font-semibold text-white" style="background-color:#4A90D9">Back to Dashboard</router-link>
+      </div>
+
+      <!-- Already reviewed -->
+      <div v-else-if="alreadyReviewed" class="rounded-2xl border p-8 text-center" style="background-color:#fff;border-color:#E8F0FE">
+        <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style="background-color:rgba(74,144,217,0.1)">
+          <svg class="w-10 h-10" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h2 class="text-2xl font-extrabold mb-2" style="color:#1B3A5C">Already Reviewed</h2>
+        <p class="text-sm mb-6" style="color:#1B3A5C;opacity:0.7">You have already submitted a review for this session.</p>
+        <router-link to="/dashboard" class="inline-block px-8 py-3 rounded-xl text-sm font-semibold text-white" style="background-color:#4A90D9">
+          Back to Dashboard
+        </router-link>
       </div>
 
       <!-- Review form -->

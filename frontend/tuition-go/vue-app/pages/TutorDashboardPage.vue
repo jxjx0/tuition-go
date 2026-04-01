@@ -118,8 +118,8 @@ const tutorReviews = ref<any[]>([])
 
 async function fetchReviews(id: string) {
   try {
-    const { data } = await api.get(`/reviews/review/${id}`)
-    tutorReviews.value = data?.data?.reviews ?? []
+    const { data } = await api.get(`/get-tutor/${id}`)
+    tutorReviews.value = data?.reviews ?? []
   } catch {
     tutorReviews.value = []
   }
@@ -287,8 +287,9 @@ const tutorStats = computed(() => [
           <div class="space-y-3">
             <div v-for="review in tutorReviews" :key="review.review_id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
               <div class="flex items-center gap-2 mb-2">
-                <img :src="'https://api.dicebear.com/9.x/notionists/svg?seed=' + review.student_id" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
+                <img :src="review.studentAvatar || 'https://api.dicebear.com/9.x/notionists/svg?seed=' + review.student_id" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
                 <div class="flex-1 min-w-0">
+                  <p class="text-xs font-semibold" style="color:#1B3A5C">{{ review.studentName || 'Anonymous' }}</p>
                   <StarRating :modelValue="review.rating" size="sm"/>
                 </div>
               </div>

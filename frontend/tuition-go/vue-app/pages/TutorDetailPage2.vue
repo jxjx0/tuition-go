@@ -2,10 +2,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { StarRating } from '../components'
-import { findTutorById } from "../composables/useTutors"
 import { useSessionService } from '../services/sessionService'
+import { useApi } from '../services/api'
 
-function toUtcDate(d: string) { return new Date(d + 'Z') }
+function toUtcDate(d: string) { return new Date(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(d) ? d : d + 'Z') }
 function formatDate(d: string) {
   return toUtcDate(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
@@ -15,24 +15,36 @@ function formatTime(d: string) {
 
 const route = useRoute()
 const tutorId = computed(() => route.params.id as string)
-const { tutor, searchForTutor, loading } = findTutorById()
 const sessionService = useSessionService()
+const api = useApi()
+
+const tutor = ref<any>(null)
+const loading = ref(true)
+const tutorReviews = ref<any[]>([])
 
 const sessions = ref<any[]>([])
 const sessionsLoading = ref(true)
 const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
-const tutorReviews = computed(() => [])
 
 onMounted(async () => {
-  searchForTutor(tutorId.value)
-  try {
-    const { data } = await sessionService.getTutorSessions(tutorId.value)
-    sessions.value = data
-  } catch (err) {
-    console.error('Failed to fetch sessions', err)
-  } finally {
-    sessionsLoading.value = false
+  const [tutorResult, sessionsResult] = await Promise.allSettled([
+    api.get(`/get-tutor/${tutorId.value}`),
+    sessionService.getTutorSessions(tutorId.value),
+  ])
+
+  if (tutorResult.status === 'fulfilled') {
+    const data = tutorResult.value.data
+    tutor.value = data
+    tutorReviews.value = data.reviews ?? []
   }
+  loading.value = false
+
+  if (sessionsResult.status === 'fulfilled') {
+    sessions.value = sessionsResult.value.data
+  } else {
+    console.error('Failed to fetch sessions', sessionsResult.reason)
+  }
+  sessionsLoading.value = false
 })
 </script>
 

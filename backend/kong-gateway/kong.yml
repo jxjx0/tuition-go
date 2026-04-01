@@ -227,6 +227,19 @@ services:
         methods: [GET, OPTIONS]
         strip_path: true
 
+  - name: get-tutor-service
+    url: http://get-tutor:5109/get-tutor
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: get-tutor-route
+        paths: [/api/v1/get-tutor]
+        methods: [GET, OPTIONS]
+        strip_path: true
+
   - name: get-sessions-service
     url: http://get-sessions:5103/getsessions
     plugins:

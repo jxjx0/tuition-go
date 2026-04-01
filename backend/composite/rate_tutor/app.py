@@ -68,7 +68,17 @@ class RateTutor(Resource):
         if session.get("tutorId") != tutor_id:
             return {"message": "tutor_id does not match the session's tutor"}, 400
 
-        # 3. Submit review to OutSystems
+        # 3. Check for duplicate review (same session_id already reviewed)
+        existing_resp = requests.get(
+            f"{REVIEW_SERVICE_URL}/review/{tutor_id}",
+            timeout=10
+        )
+        if existing_resp.status_code == 200:
+            existing_reviews = existing_resp.json().get("data", {}).get("reviews", [])
+            if any(r.get("session_id") == session_id for r in existing_reviews):
+                return {"message": "You have already reviewed this session"}, 409
+
+        # 4. Submit review to OutSystems
         import time
         review_payload = {
             "review_id": int(time.time() * 1000),
@@ -88,7 +98,7 @@ class RateTutor(Resource):
         if review_resp.status_code not in (200, 201):
             return {"message": "Failed to submit review", "error": review_resp.text}, 500
 
-        # 4. Update tutor average rating
+        # 5. Update tutor average rating
         rating_resp = requests.put(
             f"{TUTOR_SERVICE_URL}/tutor/updateRating",
             json={"tutorId": tutor_id, "newRating": rating},
