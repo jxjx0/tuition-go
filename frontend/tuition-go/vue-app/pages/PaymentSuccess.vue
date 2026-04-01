@@ -12,18 +12,14 @@ type StepStatus = 'waiting' | 'loading' | 'done' | 'error'
 
 const steps = ref([
   { label: 'Stripe redirected with session ID', status: 'done' as StepStatus },
-  { label: 'Verifying payment with Stripe',     status: 'waiting' as StepStatus },
-  { label: 'Calling process-booking composite service',           status: 'waiting' as StepStatus },
+  { label: 'Confirming booking',                status: 'waiting' as StepStatus },
 ])
 
 const loading = ref(true)
 const error = ref<string | null>(null)
 const booking = ref<{
   session_id: string
-  student_id: string
-  tutor_id: string
-  amount_total: number
-  stripe_session_id: string
+  student_email: string
 } | null>(null)
 
 onMounted(async () => {
@@ -33,24 +29,11 @@ onMounted(async () => {
     return
   }
   try {
-    // Step 1: Verify payment
     steps.value[1].status = 'loading'
-    const { data: paymentData } = await api.post("/payments/verify", {
+    const { data: bookingData } = await api.post("/process-booking/process-booking", {
       stripe_session_id: stripeSessionId,
     });
     steps.value[1].status = 'done'
-
-    // Step 2: Process booking
-    steps.value[2].status = 'loading'
-    const { data: bookingData } = await api.post("/process-booking/process-booking", {
-      session_id:        paymentData.session_id,
-      student_id:        paymentData.student_id,
-      tutor_id:          paymentData.tutor_id,
-      amount_total:      paymentData.amount_total,
-      stripe_session_id: stripeSessionId,
-    });
-    steps.value[2].status = 'done'
-
     booking.value = bookingData
   } catch (err) {
     const failingStep = steps.value.find(s => s.status === 'loading')
@@ -138,20 +121,8 @@ onMounted(async () => {
             <span class="font-mono font-semibold text-slate-800">{{ booking.session_id }}</span>
           </div>
           <div class="flex justify-between py-3">
-            <span class="text-slate-500">Student ID</span>
-            <span class="font-mono font-semibold text-slate-800">{{ booking.student_id }}</span>
-          </div>
-          <div class="flex justify-between py-3">
-            <span class="text-slate-500">Tutor ID</span>
-            <span class="font-mono font-semibold text-slate-800">{{ booking.tutor_id }}</span>
-          </div>
-          <div class="flex justify-between py-3">
-            <span class="text-slate-500">Amount Paid</span>
-            <span class="font-bold text-emerald-600">SGD {{ (booking.amount_total / 100).toFixed(2) }}</span>
-          </div>
-          <div class="flex justify-between py-3">
-            <span class="text-slate-500">Stripe Session</span>
-            <span class="font-mono text-xs text-slate-500">{{ booking.stripe_session_id }}</span>
+            <span class="text-slate-500">Student Email</span>
+            <span class="font-semibold text-slate-800">{{ booking.student_email }}</span>
           </div>
         </div>
       </div>

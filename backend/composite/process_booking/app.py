@@ -18,13 +18,10 @@ SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:50
 TUTOR_SERVICE_URL = os.environ.get("TUTOR_SERVICE_URL", "http://localhost:5002")
 STUDENT_SERVICE_URL = os.environ.get("STUDENT_SERVICE_URL", "http://localhost:5001")
 CALENDAR_SERVICE_URL = os.environ.get("CALENDAR_SERVICE_URL", "http://localhost:5005")
+PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://localhost:5007")
 
 process_booking_input = api.model('ProcessBookingInput', {
-    'session_id':        fields.String(required=True, description='The session UUID'),
-    'student_id':        fields.String(required=True, description='The student UUID'),
-    'tutor_id':          fields.String(required=True, description='The tutor UUID'),
-    'amount_total':      fields.Integer(description='Amount paid in cents'),
-    'stripe_session_id': fields.String(description='Stripe checkout session ID'),
+    'stripe_session_id': fields.String(required=True, description='Stripe checkout session ID'),
 })
 
 
@@ -40,13 +37,31 @@ class ProcessBooking(Resource):
     def post(self):
         """Called after successful Stripe payment to complete the booking."""
         data = request.get_json()
-        session_id = data.get("session_id")
-        if not session_id:
-            return {"message": "session_id is required"}, 400
+        stripe_session_id = data.get("stripe_session_id")
+        if not stripe_session_id:
+            return {"message": "stripe_session_id is required"}, 400
 
         auth_header = request.headers.get("Authorization", "")
 
-        # 1. Extract student's Clerk user ID from their JWT
+        # 1. Verify payment and extract booking context from Stripe metadata
+        payment_resp = requests.post(
+            f"{PAYMENT_SERVICE_URL}/payment/verify",
+            json={"stripe_session_id": stripe_session_id},
+            timeout=10
+        )
+        if payment_resp.status_code == 402:
+            return {"message": "Payment not completed"}, 402
+        if payment_resp.status_code != 200:
+            return {"message": "Failed to verify payment"}, 500
+
+        payment_data = payment_resp.json()
+        session_id = payment_data.get("session_id")
+        student_id = payment_data.get("student_id")
+
+        if not session_id or not student_id:
+            return {"message": "Missing booking context in payment metadata"}, 500
+
+        # 2. Extract student's Clerk user ID from their JWT
         token = auth_header.replace("Bearer ", "")
         try:
             claims = pyjwt.decode(token, options={"verify_signature": False})
@@ -94,7 +109,6 @@ class ProcessBooking(Resource):
             return {"message": "Student email not found"}, 500
 
         # 4. Update session status to booked and assign student
-        student_id = data.get("student_id")
         update_resp = requests.put(
             f"{SESSION_SERVICE_URL}/session/{session_id}",
             json={"status": "booked", "studentId": student_id},

@@ -173,6 +173,7 @@ services:
       - TUTOR_SERVICE_URL=http://tutor:5002
       - STUDENT_SERVICE_URL=http://student:5001
       - CALENDAR_SERVICE_URL=http://calendar:5005
+      - PAYMENT_SERVICE_URL=http://payment:5007
     networks:
       - tuition-network
     restart: unless-stopped
