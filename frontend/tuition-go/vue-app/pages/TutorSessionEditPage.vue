@@ -186,6 +186,17 @@ async function deleteSession() {
               </div>
             </div>
 
+            <!-- Meeting link for booked sessions -->
+            <div v-if="session.status==='booked'&&session.meetingLink" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
+              <p class="text-xs font-semibold mb-2" style="color:#1B3A5C">Google Meet</p>
+              <a :href="session.meetingLink" target="_blank" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90" style="background-color:#2EAA4F">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                Join Meeting
+              </a>
+            </div>
+
             <!-- Booked warning + cancel -->
             <div v-if="!isEditable" class="space-y-4">
               <div class="p-4 rounded-xl text-sm font-medium" style="background-color:#FFF8E7;color:#B7791F;border:1px solid #F6E05E">

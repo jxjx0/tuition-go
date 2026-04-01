@@ -242,7 +242,8 @@ const tutorStats = [
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0 items-end">
                   <span v-if="session.totalPrice" class="text-sm font-bold" style="color:#2EAA4F">${{ session.totalPrice.toFixed(2) }}</span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='booked'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='booked'?'Booked':'Available' }}</span>
+                  <!-- <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='booked'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='booked'?'Booked':'Available' }}</span> -->
+                  <a v-if="session.status==='booked'&&session.meetingLink" :href="session.meetingLink" target="_blank" @click.stop class="px-3 py-1.5 rounded-xl text-xs font-semibold text-white hover:opacity-90" style="background-color:#2EAA4F">Join Meeting</a>
                 </div>
               </div>
             </div>
