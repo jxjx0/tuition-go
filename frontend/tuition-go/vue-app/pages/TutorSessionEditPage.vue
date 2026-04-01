@@ -151,22 +151,41 @@ async function deleteSession() {
 
           <!-- Details view -->
           <div v-if="!isEditing" class="p-6 space-y-5">
+            <!-- Date & Time card -->
+            <div class="rounded-xl p-4 space-y-3" style="background-color:#F5F7FA;border:1px solid #E8F0FE">
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color:#E8F0FE">
+                  <svg class="w-4 h-4" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase mb-0.5" style="color:#1B3A5C;opacity:0.4">Date</p>
+                  <p class="text-sm font-bold" style="color:#1B3A5C">{{ toUtcDate(session.startTime).toLocaleDateString('en-SG', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) }}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color:#E8F0FE">
+                  <svg class="w-4 h-4" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold uppercase mb-0.5" style="color:#1B3A5C;opacity:0.4">Time</p>
+                  <p class="text-sm font-bold" style="color:#1B3A5C">
+                    {{ toUtcDate(session.startTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) }}
+                    –
+                    {{ toUtcDate(session.endTime).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) }}
+                    <span class="font-normal" style="color:#1B3A5C;opacity:0.5">· {{ session.durationMins }} mins</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+            <!-- Subject & Price -->
             <div class="grid grid-cols-2 gap-5">
               <div>
                 <p class="text-xs font-semibold uppercase mb-1" style="color:#1B3A5C;opacity:0.4">Subject</p>
                 <p class="text-sm font-semibold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</p>
-              </div>
-              <div>
-                <p class="text-xs font-semibold uppercase mb-1" style="color:#1B3A5C;opacity:0.4">Duration</p>
-                <p class="text-sm font-semibold" style="color:#1B3A5C">{{ session.durationMins }} mins</p>
-              </div>
-              <div>
-                <p class="text-xs font-semibold uppercase mb-1" style="color:#1B3A5C;opacity:0.4">Start</p>
-                <p class="text-sm font-semibold" style="color:#1B3A5C">{{ toUtcDate(session.startTime).toLocaleString('en-SG', { timeZone: 'UTC' }) }}</p>
-              </div>
-              <div>
-                <p class="text-xs font-semibold uppercase mb-1" style="color:#1B3A5C;opacity:0.4">End</p>
-                <p class="text-sm font-semibold" style="color:#1B3A5C">{{ toUtcDate(session.endTime).toLocaleString('en-SG', { timeZone: 'UTC' }) }}</p>
               </div>
               <div v-if="session.totalPrice">
                 <p class="text-xs font-semibold uppercase mb-1" style="color:#1B3A5C;opacity:0.4">Total Price</p>
