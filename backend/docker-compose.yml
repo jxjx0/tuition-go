@@ -23,6 +23,7 @@ services:
       - process-booking
       - create-session
       - update-session
+      - delete-session
       - cancel-session
       - rate-tutor
       - get-sessions
@@ -201,6 +202,21 @@ services:
     container_name: update-session-service
     ports:
       - "5106:5106"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  delete-session:
+    build:
+      context: ./composite/delete_session
+      dockerfile: Dockerfile
+    container_name: delete-session-service
+    ports:
+      - "5107:5107"
     environment:
       - SESSION_SERVICE_URL=http://session:5003
       - TUTOR_SERVICE_URL=http://tutor:5002

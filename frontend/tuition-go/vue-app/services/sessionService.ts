@@ -32,7 +32,7 @@ export function useSessionService() {
     },
 
     deleteSession(sessionId: string) {
-      return api.delete(`/sessions/${sessionId}`)
+      return api.delete(`/delete-session/${sessionId}`)
     },
 
     createSessionWithCalendar(payload: {

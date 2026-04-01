@@ -27,6 +27,29 @@ const slotForm = ref({ tutorSubjectId: '', date: '', startTime: '', endTime: '' 
 const slotError = ref('')
 const slotCreating = ref(false)
 
+// Generate time options in 15-min increments (00:00 – 23:45)
+const timeOptions = Array.from({ length: 96 }, (_, i) => {
+  const h = Math.floor(i / 4).toString().padStart(2, '0')
+  const m = ((i % 4) * 15).toString().padStart(2, '0')
+  const value = `${h}:${m}`
+  const hour = Math.floor(i / 4)
+  const ampm = hour < 12 ? 'AM' : 'PM'
+  const h12 = (hour % 12 || 12).toString()
+  const label = `${h12}:${m} ${ampm}`
+  return { value, label }
+})
+
+const slotDuration = computed(() => {
+  if (!slotForm.value.startTime || !slotForm.value.endTime) return null
+  const [sh, sm] = slotForm.value.startTime.split(':').map(Number)
+  const [eh, em] = slotForm.value.endTime.split(':').map(Number)
+  const mins = (eh * 60 + em) - (sh * 60 + sm)
+  if (mins <= 0) return null
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  return h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
+})
+
 async function handleCreateSlot() {
   slotError.value = ''
   if (!slotForm.value.tutorSubjectId || !slotForm.value.date || !slotForm.value.startTime || !slotForm.value.endTime) {
@@ -128,32 +151,49 @@ const tutorStats = [
       </div>
 
       <div v-if="showCreateSlot" class="rounded-2xl border p-6 mb-8" style="background-color:#fff;border-color:#E8F0FE">
-        <h3 class="text-lg font-bold mb-4" style="color:#1B3A5C">New Session Slot</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h3 class="text-lg font-bold mb-5" style="color:#1B3A5C">New Session Slot</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Subject -->
           <div>
-            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Subject</label>
-            <select v-model="slotForm.tutorSubjectId" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C">
+            <label class="text-xs font-semibold uppercase mb-1.5 block" style="color:#1B3A5C;opacity:0.5">Subject</label>
+            <select v-model="slotForm.tutorSubjectId" class="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none" style="border-color:#E8F0FE;color:#1B3A5C">
               <option value="" disabled>Select subject</option>
               <option v-for="s in tutor?.subjects" :key="s.tutorSubjectId" :value="s.tutorSubjectId">
                 {{ s.subject }} ({{ s.academicLevel }})
               </option>
             </select>
           </div>
+          <!-- Date -->
           <div>
-            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Date</label>
-            <input v-model="slotForm.date" type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
+            <label class="text-xs font-semibold uppercase mb-1.5 block" style="color:#1B3A5C;opacity:0.5">Date</label>
+            <input v-model="slotForm.date" type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none" style="border-color:#E8F0FE;color:#1B3A5C"/>
           </div>
+          <!-- Start time -->
           <div>
-            <label class="text-xs font-medium mb-1.5 block" style="color:#1B3A5C">Time</label>
-            <div class="flex items-center gap-2">
-              <input v-model="slotForm.startTime" type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
-              <span class="text-xs" style="color:#1B3A5C;opacity:0.5">to</span>
-              <input v-model="slotForm.endTime" type="time" class="flex-1 px-4 py-2.5 rounded-xl text-sm border" style="border-color:#E8F0FE;color:#1B3A5C"/>
-            </div>
+            <label class="text-xs font-semibold uppercase mb-1.5 block" style="color:#1B3A5C;opacity:0.5">Start Time</label>
+            <select v-model="slotForm.startTime" class="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none" style="border-color:#E8F0FE;color:#1B3A5C">
+              <option value="" disabled>Select start time</option>
+              <option v-for="t in timeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+            </select>
+          </div>
+          <!-- End time -->
+          <div>
+            <label class="text-xs font-semibold uppercase mb-1.5 block" style="color:#1B3A5C;opacity:0.5">End Time</label>
+            <select v-model="slotForm.endTime" class="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none" style="border-color:#E8F0FE;color:#1B3A5C">
+              <option value="" disabled>Select end time</option>
+              <option v-for="t in timeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+            </select>
           </div>
         </div>
+        <!-- Duration pill -->
+        <div v-if="slotDuration" class="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold" style="background-color:#E8F0FE;color:#4A90D9">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          {{ slotDuration }}
+        </div>
         <p v-if="slotError" class="mt-3 text-xs" style="color:#E74C3C">{{ slotError }}</p>
-        <div class="flex items-center gap-3 mt-4">
+        <div class="flex items-center gap-3 mt-5">
           <button @click="handleCreateSlot" :disabled="slotCreating" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center gap-2" style="background-color:#2EAA4F">
             <svg v-if="slotCreating" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>

@@ -54,6 +54,11 @@ update_meeting_model = api.model('UpdateMeetingRequest', {
     'studentEmail': fields.String(required=True, description='Student email to add as attendee'),
 })
 
+delete_meeting_model = api.model('DeleteMeetingRequest', {
+    'eventId':      fields.String(required=True, description='Google Calendar event ID to delete'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+})
+
 reschedule_meeting_model = api.model('RescheduleMeetingRequest', {
     'eventId':      fields.String(required=True, description='Google Calendar event ID to reschedule'),
     'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
@@ -231,6 +236,46 @@ class UpdateMeeting(Resource):
             return {"error": f"An error occurred: {error}"}, 500
         except Exception as e:
             logger.exception("General error updating meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/delete-meeting")
+class DeleteMeeting(Resource):
+    @api.expect(delete_meeting_model)
+    def post(self):
+        """Deletes a Google Calendar event using the tutor's OAuth token. Notifies all attendees."""
+        data = request.json
+        event_id       = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+
+        if not event_id or not tutor_clerk_id:
+            return {"error": "eventId and tutorClerkId are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            service.events().delete(
+                calendarId='primary',
+                eventId=event_id,
+                sendUpdates='all'
+            ).execute()
+
+            logger.info(f"Event {event_id} deleted")
+            return {"message": "Meeting deleted successfully"}, 200
+
+        except HttpError as error:
+            if error.resp.status == 410:
+                # Already deleted — treat as success
+                logger.warning(f"Event {event_id} already deleted (410 Gone)")
+                return {"message": "Meeting already deleted"}, 200
+            logger.error(f"HTTP Error deleting event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error deleting meeting")
             return {"error": str(e)}, 500
 
 
