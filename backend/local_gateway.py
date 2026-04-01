@@ -22,6 +22,7 @@ SERVICES = {
     "/api/v1/book-session": "http://localhost:5100/book-session",
     "/api/v1/cancel-session": "http://localhost:5101/cancel-session",
     "/api/v1/rate-tutor": "http://localhost:5102/rate-tutor",
+    "/api/v1/reviews": "https://personal-rkcavjxu.outsystemscloud.com/Review/rest/Review",
     "/api/v1/getsessions": "http://localhost:5103/getsessions",
 }
 
