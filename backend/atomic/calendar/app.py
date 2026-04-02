@@ -54,6 +54,26 @@ update_meeting_model = api.model('UpdateMeetingRequest', {
     'studentEmail': fields.String(required=True, description='Student email to add as attendee'),
 })
 
+delete_meeting_model = api.model('DeleteMeetingRequest', {
+    'eventId':      fields.String(required=True, description='Google Calendar event ID to delete'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+})
+
+cancel_meeting_model = api.model('CancelMeetingRequest', {
+    'eventId':      fields.String(required=True, description='Google Calendar event ID to update'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+    'studentEmail': fields.String(required=True, description='Student email to remove as attendee'),
+})
+
+reschedule_meeting_model = api.model('RescheduleMeetingRequest', {
+    'eventId':      fields.String(required=True, description='Google Calendar event ID to reschedule'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+    'summary':      fields.String(description='New event title'),
+    'start_time':   fields.String(required=True, description='New start time in ISO format'),
+    'end_time':     fields.String(required=True, description='New end time in ISO format'),
+    'timezone':     fields.String(description='Timezone (e.g. Asia/Singapore)', default='UTC'),
+})
+
 
 def get_google_token_for_user(clerk_user_id: str) -> str:
     """Fetches the user's Google OAuth token from Clerk's Backend API."""
@@ -222,6 +242,202 @@ class UpdateMeeting(Resource):
             return {"error": f"An error occurred: {error}"}, 500
         except Exception as e:
             logger.exception("General error updating meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/cancel-meeting")
+class CancelMeeting(Resource):
+    @api.expect(cancel_meeting_model)
+    def post(self):
+        """Removes a student as attendee from an existing tutor calendar event and marks it as Pending."""
+        data = request.json
+        event_id = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+        student_email = data.get('studentEmail')
+
+        if not event_id or not tutor_clerk_id or not student_email:
+            return {"error": "eventId, tutorClerkId and studentEmail are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get tutor calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            # Fetch current event from tutor's calendar
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+
+            # Remove student from attendees list
+            attendees = event.get('attendees', [])
+            attendees = [a for a in attendees if a.get('email', '').lower() != student_email.lower()]
+            event['attendees'] = attendees
+
+            # Revert title back to Pending so tutor knows the slot is free
+            event['summary'] = event.get('summary', 'Tutor Session').replace('(Booked)', '(Pending)')
+
+            updated_event = service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event,
+                sendUpdates='all'  # automatically emails cancellation notice to student
+            ).execute()
+
+            logger.info(f"Event {event_id}: student {student_email} removed from attendees")
+            return {
+                "message": "Student removed from calendar event successfully",
+                "eventId": updated_event.get('id'),
+            }, 200
+
+        except HttpError as error:
+            logger.error(f"HTTP Error cancelling event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error cancelling meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/cancel-meeting")
+class CancelMeeting(Resource):
+    @api.expect(cancel_meeting_model)
+    def post(self):
+        """Removes a student attendee from an existing tutor calendar event (on cancellation)."""
+        data = request.json
+        event_id       = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+        student_email  = data.get('studentEmail')
+
+        if not event_id or not tutor_clerk_id or not student_email:
+            return {"error": "eventId, tutorClerkId and studentEmail are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get tutor calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            # Fetch current event from tutor's calendar
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+
+            # Remove student from attendees list
+            attendees = event.get('attendees', [])
+            attendees = [a for a in attendees if a.get('email', '').lower() != student_email.lower()]
+            event['attendees'] = attendees
+
+            # Revert title back to indicate the slot is free again
+            event['summary'] = event.get('summary', 'Tutor Session').replace('(Booked)', '(Available)')
+
+            updated_event = service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event,
+                sendUpdates='all'  # automatically sends cancellation notice to student
+            ).execute()
+
+            logger.info(f"Event {event_id}: student {student_email} removed from attendees")
+            return {
+                "message": "Student removed from calendar event successfully",
+                "eventId": updated_event.get('id'),
+            }, 200
+
+        except HttpError as error:
+            logger.error(f"HTTP Error cancelling event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error cancelling meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/delete-meeting")
+class DeleteMeeting(Resource):
+    @api.expect(delete_meeting_model)
+    def post(self):
+        """Deletes a Google Calendar event using the tutor's OAuth token. Notifies all attendees."""
+        data = request.json
+        event_id       = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+
+        if not event_id or not tutor_clerk_id:
+            return {"error": "eventId and tutorClerkId are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            service.events().delete(
+                calendarId='primary',
+                eventId=event_id,
+                sendUpdates='all'
+            ).execute()
+
+            logger.info(f"Event {event_id} deleted")
+            return {"message": "Meeting deleted successfully"}, 200
+
+        except HttpError as error:
+            if error.resp.status == 410:
+                # Already deleted — treat as success
+                logger.warning(f"Event {event_id} already deleted (410 Gone)")
+                return {"message": "Meeting already deleted"}, 200
+            logger.error(f"HTTP Error deleting event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error deleting meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/reschedule-meeting")
+class RescheduleMeeting(Resource):
+    @api.expect(reschedule_meeting_model)
+    def post(self):
+        """Updates an existing Google Calendar event's time and/or title."""
+        data = request.json
+        event_id      = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+        start_time    = data.get('start_time')
+        end_time      = data.get('end_time')
+        timezone      = data.get('timezone', 'UTC')
+        summary       = data.get('summary')
+
+        if not event_id or not tutor_clerk_id or not start_time or not end_time:
+            return {"error": "eventId, tutorClerkId, start_time and end_time are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+
+            event['start'] = {'dateTime': start_time, 'timeZone': timezone}
+            event['end']   = {'dateTime': end_time,   'timeZone': timezone}
+            if summary:
+                event['summary'] = summary
+
+            updated_event = service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event,
+                sendUpdates='all'
+            ).execute()
+
+            logger.info(f"Event {event_id} rescheduled")
+            return {
+                "message": "Meeting rescheduled successfully",
+                "eventId": updated_event.get('id'),
+                "hangoutLink": updated_event.get('hangoutLink')
+            }, 200
+
+        except HttpError as error:
+            logger.error(f"HTTP Error rescheduling event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error rescheduling meeting")
             return {"error": str(e)}, 500
 
 

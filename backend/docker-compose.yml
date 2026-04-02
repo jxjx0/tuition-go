@@ -21,6 +21,9 @@ services:
       - payment
       - checkout
       - process-booking
+      - create-session
+      - update-session
+      - delete-session
       - cancel-session
       - rate-tutor
       - get-sessions
@@ -173,6 +176,51 @@ services:
       - TUTOR_SERVICE_URL=http://tutor:5002
       - STUDENT_SERVICE_URL=http://student:5001
       - CALENDAR_SERVICE_URL=http://calendar:5005
+      - PAYMENT_SERVICE_URL=http://payment:5007
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  create-session:
+    build:
+      context: ./composite/create_session
+      dockerfile: Dockerfile
+    container_name: create-session-service
+    ports:
+      - "5105:5105"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  update-session:
+    build:
+      context: ./composite/update_session
+      dockerfile: Dockerfile
+    container_name: update-session-service
+    ports:
+      - "5106:5106"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  delete-session:
+    build:
+      context: ./composite/delete_session
+      dockerfile: Dockerfile
+    container_name: delete-session-service
+    ports:
+      - "5107:5107"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - CALENDAR_SERVICE_URL=http://calendar:5005
     networks:
       - tuition-network
     restart: unless-stopped
@@ -184,6 +232,16 @@ services:
     container_name: cancel-session-service
     ports:
       - "5101:5101"
+    env_file:
+      - .env
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - STUDENT_SERVICE_URL=http://student:5001
+      - PAYMENT_SERVICE_URL=http://payment:5007
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+      - EMAIL_SERVICE_URL=http://email:5006
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
     networks:
       - tuition-network
     restart: unless-stopped

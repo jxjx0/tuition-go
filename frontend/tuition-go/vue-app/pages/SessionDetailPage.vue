@@ -43,6 +43,9 @@ const session = ref<Session | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showCancel = ref(false)
+const cancelling = ref(false)
+const cancelledSuccess = ref(false)
+const cancelError = ref<string | null>(null)
 const sessionService = useSessionService()
 const api = useApi()
 const booking = ref(false)
@@ -74,8 +77,19 @@ const isOwner = computed(() =>
 
 const statusLabel = computed(() => { 
   if (!session.value) return ''
-  const m: Record<string, string> = { pending: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled', available: 'Available' }
+  const m: Record<string, string> = { available: 'Available', booked: 'Upcoming', completed: 'Completed', cancelled: 'Cancelled' }
   return m[session.value.status] || session.value.status 
+})
+
+const canCancel = computed(() => {
+  if (!session.value || session.value.status !== 'pending') return false
+  const now = new Date()
+  // The database stores SGT time (e.g. 18:00) as a fixed UTC number (18:00Z).
+  // SGT 18:00 is actually 10:00 UTC. To get the real UTC, we subtract 8 hours.
+  const startSgt = toUtcDate(session.value.startTime)
+  const startUtc = new Date(startSgt.getTime() - (8 * 60 * 60 * 1000))
+  const diffHours = (startUtc.getTime() - now.getTime()) / (1000 * 60 * 60)
+  return diffHours >= 2
 })
 
 const headerStyle = computed(() => { 
@@ -123,9 +137,20 @@ async function fetchSession() {
   }
 }
 
-function cancelSession() { 
-  showCancel.value = false
-  router.push('/dashboard') 
+async function cancelSession() {
+  if (!session.value || !currentStudentId.value) return
+  cancelling.value = true
+  cancelError.value = null
+  try {
+    await sessionService.cancelSession(session.value.id, currentStudentId.value)
+    cancelledSuccess.value = true
+    showCancel.value = false
+  } catch (err: any) {
+    const msg = err.response?.data?.message || 'Failed to cancel session. Please try again.'
+    cancelError.value = msg
+  } finally {
+    cancelling.value = false
+  }
 }
 
 onMounted(() => {
@@ -156,6 +181,16 @@ onMounted(() => {
         <h2 class="text-xl font-bold" style="color:#E74C3C">You are not authorised to view this session.</h2>
         <router-link to="/dashboard" class="mt-4 inline-block px-6 py-2 rounded-lg text-sm font-semibold text-white" style="background-color:#4A90D9">Back to Dashboard</router-link>
       </div>
+      <div v-else-if="cancelledSuccess" class="rounded-2xl border p-12 text-center" style="background-color:#fff;border-color:#E8F0FE">
+        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        </div>
+        <h2 class="text-3xl font-extrabold mb-4" style="color:#1B3A5C">Cancellation Confirmed</h2>
+        <p class="text-lg mb-8" style="color:#1B3A5C;opacity:0.7">Your session has been successfully cancelled and a full refund has been initiated.</p>
+        <router-link to="/dashboard" class="inline-block px-8 py-4 rounded-xl text-lg font-bold text-white hover:opacity-90" style="background-color:#4A90D9">Return to Dashboard</router-link>
+      </div>
       <div v-else-if="session" class="rounded-2xl border overflow-hidden" style="background-color:#fff;border-color:#E8F0FE">
         <div class="p-6" :style="headerStyle">
           <span class="px-3 py-1 rounded-full text-xs font-bold mb-3 inline-block" style="background-color:rgba(255,255,255,0.2);color:#fff">{{ statusLabel }}</span>
@@ -171,21 +206,38 @@ onMounted(() => {
             </div>
             <p class="text-xl font-extrabold" style="color:#2EAA4F">${{ session.price.toFixed(2) }}</p>
           </div>
-          <div class="space-y-4">
-            <div class="flex items-center justify-between py-3 border-b" style="border-color:#E8F0FE">
-              <span class="text-sm" style="color:#1B3A5C;opacity:0.7">Date</span>
-              <span class="text-sm font-semibold" style="color:#1B3A5C">{{ fmtDate(session.date) }}</span>
+          <div class="rounded-xl p-4 space-y-3" style="background-color:#F5F7FA;border:1px solid #E8F0FE">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color:#E8F0FE">
+                <svg class="w-4 h-4" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase mb-0.5" style="color:#1B3A5C;opacity:0.4">Date</p>
+                <p class="text-sm font-bold" style="color:#1B3A5C">{{ fmtDate(session.date) }}</p>
+              </div>
             </div>
-            <div class="flex items-center justify-between py-3 border-b" style="border-color:#E8F0FE">
-              <span class="text-sm" style="color:#1B3A5C;opacity:0.7">Time</span>
-              <span class="text-sm font-semibold" style="color:#1B3A5C">{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }} ({{ session.durationMins }} min)</span>
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style="background-color:#E8F0FE">
+                <svg class="w-4 h-4" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase mb-0.5" style="color:#1B3A5C;opacity:0.4">Time</p>
+                <p class="text-sm font-bold" style="color:#1B3A5C">
+                  {{ fmtTime(session.startTime) }} – {{ fmtTime(session.endTime) }}
+                  <span class="font-normal" style="color:#1B3A5C;opacity:0.5">· {{ session.durationMins }} mins</span>
+                </p>
+              </div>
             </div>
           </div>
           <div v-if="session.notes" class="p-4 rounded-xl" style="background-color:#F5F7FA">
             <p class="text-xs font-semibold mb-1" style="color:#1B3A5C">Session Notes</p>
             <p class="text-sm" style="color:#1B3A5C;opacity:0.8">{{ session.notes }}</p>
           </div>
-          <div v-if="session.meetingLink&&session.status==='pending'" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
+          <div v-if="session.meetingLink&&session.status==='booked'" class="p-4 rounded-xl border" style="border-color:#E8F0FE">
             <p class="text-xs font-semibold mb-2" style="color:#1B3A5C">Google Meet</p>
             <a :href="session.meetingLink" target="_blank" class="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90" style="background-color:#2EAA4F">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -202,15 +254,30 @@ onMounted(() => {
   </svg>
   {{ booking ? 'Processing...' : 'Book Session' }}
 </button>
-            <button v-if="session.status==='pending'&&!showCancel&&userRole==='student'" @click="showCancel=true" class="flex-1 py-3 rounded-xl text-sm font-semibold border hover:bg-red-50" style="border-color:#ef4444;color:#ef4444">Cancel Session</button>
+            <button v-if="session.status==='pending'&&!showCancel&&userRole==='student'" @click="showCancel=true" :disabled="!canCancel" :class="[!canCancel ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-red-50']" class="flex-1 py-3 rounded-xl text-sm font-semibold border" style="border-color:#ef4444;color:#ef4444">
+              {{ canCancel ? 'Cancel Session' : 'Cancellation Unavailable (< 2h)' }}
+            </button>
             <router-link v-if="session.status==='completed'&&userRole==='student'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
           </div>
           <div v-if="showCancel" class="p-5 rounded-xl border" style="border-color:#ef4444;background-color:rgba(239,68,68,0.03)">
             <p class="text-sm font-bold mb-1" style="color:#ef4444">Cancel this session?</p>
             <p class="text-xs mb-4" style="color:#1B3A5C;opacity:0.7">A full refund will be processed within 3-5 business days.</p>
+            <!-- Error from backend (e.g. < 2-hour window) -->
+            <div v-if="cancelError" class="mb-3 p-3 rounded-lg text-xs font-medium" style="background-color:rgba(239,68,68,0.08);color:#ef4444">{{ cancelError }}</div>
             <div class="flex gap-3">
-              <button @click="cancelSession" class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white" style="background-color:#ef4444">Yes, Cancel</button>
-              <button @click="showCancel=false" class="px-6 py-2.5 rounded-xl text-sm font-semibold border" style="border-color:#E8F0FE;color:#1B3A5C">Keep Session</button>
+              <button
+                @click="cancelSession"
+                :disabled="cancelling"
+                class="px-6 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                style="background-color:#ef4444"
+              >
+                <svg v-if="cancelling" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                </svg>
+                {{ cancelling ? 'Cancelling...' : 'Yes, Cancel' }}
+              </button>
+              <button @click="showCancel=false; cancelError=null" :disabled="cancelling" class="px-6 py-2.5 rounded-xl text-sm font-semibold border disabled:opacity-60" style="border-color:#E8F0FE;color:#1B3A5C">Keep Session</button>
             </div>
           </div>
         </div>
