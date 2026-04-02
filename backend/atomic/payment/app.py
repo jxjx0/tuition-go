@@ -28,17 +28,6 @@ class GetConfig(Resource):
             "publishable_key": os.environ["STRIPE_PUBLISHABLE_KEY"],
         })
 
-# @api.route("/create-payment-intent")
-# class CreateCheckoutSession(Resource):
-#     def post(self):
-#         data = request.get_json()
-#         intent = stripe.PaymentIntent.create(
-#             amount=data["amount"],
-#             currency="sgd",
-#             metadata={"booking_id": data["booking_id"]}
-#         )
-#         return jsonify({"client_secret": intent.client_secret})
-
 @api.route("/create-checkout-session")
 class CreateCheckoutSession(Resource):
     def post(self):
