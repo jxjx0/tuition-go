@@ -191,57 +191,39 @@ class SessionDetail(Resource):
 def _enrich_sessions(sessions):
     """Helper function to enrich sessions with tutor details and pricing"""
     enhanced_sessions = []
-    
+
     for session in sessions:
         try:
             enhanced_session = session.copy()
             tutor_id = session.get('tutorId')
             tutor_subject_id = session.get('tutorSubjectId')
-            
-            # Get tutor details
+
+            # Single call to GET /tutor/{id} — returns name, imageURL, and subjects[]
             if tutor_id:
                 tutor_response = requests.get(
                     f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}",
                     timeout=5
                 )
-                
+
                 if tutor_response.status_code == 200:
                     tutor_data = tutor_response.json()
                     enhanced_session['tutorName'] = tutor_data.get('name', 'Unknown')
                     enhanced_session['tutorImageUrl'] = tutor_data.get('imageURL', None)
-                else:
-                    enhanced_session['tutorName'] = 'Unknown'
-                    enhanced_session['tutorImageUrl'] = None
-            else:
-                enhanced_session['tutorName'] = 'Unknown'
-                enhanced_session['tutorImageUrl'] = None
-            
-            # Get tutor subject details (hourlyRate and subject name)
-            if tutor_id and tutor_subject_id:
-                subjects_response = requests.get(
-                    f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}/subjects",
-                    timeout=5
-                )
-                
-                if subjects_response.status_code == 200:
-                    subjects = subjects_response.json()
-                    # Find the matching tutorSubject
+
+                    # Find matching subject from the nested subjects list
+                    subjects = tutor_data.get('subjects', [])
                     matching_subject = next(
                         (s for s in subjects if s.get('tutorSubjectId') == tutor_subject_id),
                         None
                     )
-                    
+
                     if matching_subject:
                         hourly_rate = matching_subject.get('hourlyRate', 0)
                         enhanced_session['subjectName'] = matching_subject.get('subject', 'Unknown')
                         enhanced_session['academicLevel'] = matching_subject.get('academicLevel', 'Unknown')
-                        
-                        # Calculate total price based on duration
                         duration_mins = session.get('durationMins', 0)
                         if duration_mins and hourly_rate:
-                            # Convert minutes to hours and multiply by hourly rate
-                            duration_hours = duration_mins / 60.0
-                            enhanced_session['totalPrice'] = round(hourly_rate * duration_hours, 2)
+                            enhanced_session['totalPrice'] = round(hourly_rate * (duration_mins / 60.0), 2)
                         else:
                             enhanced_session['totalPrice'] = 0.0
                     else:
@@ -249,19 +231,22 @@ def _enrich_sessions(sessions):
                         enhanced_session['academicLevel'] = 'Unknown'
                         enhanced_session['totalPrice'] = 0.0
                 else:
+                    enhanced_session['tutorName'] = 'Unknown'
+                    enhanced_session['tutorImageUrl'] = None
                     enhanced_session['subjectName'] = 'Unknown'
                     enhanced_session['academicLevel'] = 'Unknown'
                     enhanced_session['totalPrice'] = 0.0
             else:
+                enhanced_session['tutorName'] = 'Unknown'
+                enhanced_session['tutorImageUrl'] = None
                 enhanced_session['subjectName'] = 'Unknown'
                 enhanced_session['academicLevel'] = 'Unknown'
                 enhanced_session['totalPrice'] = 0.0
-            
+
             enhanced_sessions.append(enhanced_session)
-            
+
         except Exception as e:
             print(f"Error enhancing session {session.get('sessionId')}: {str(e)}")
-            # Add session with default values on error
             enhanced_session = session.copy()
             enhanced_session.setdefault('tutorName', 'Unknown')
             enhanced_session.setdefault('tutorImageUrl', None)
@@ -269,7 +254,7 @@ def _enrich_sessions(sessions):
             enhanced_session.setdefault('academicLevel', 'Unknown')
             enhanced_session.setdefault('totalPrice', 0.0)
             enhanced_sessions.append(enhanced_session)
-    
+
     return enhanced_sessions
 
 
