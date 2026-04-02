@@ -82,7 +82,7 @@ const statusLabel = computed(() => {
 })
 
 const canCancel = computed(() => {
-  if (!session.value || session.value.status !== 'pending') return false
+  if (!session.value || session.value.status !== 'booked') return false
   const now = new Date()
   // The database stores SGT time (e.g. 18:00) as a fixed UTC number (18:00Z).
   // SGT 18:00 is actually 10:00 UTC. To get the real UTC, we subtract 8 hours.
@@ -254,7 +254,7 @@ onMounted(() => {
   </svg>
   {{ booking ? 'Processing...' : 'Book Session' }}
 </button>
-            <button v-if="session.status==='pending'&&!showCancel&&userRole==='student'" @click="showCancel=true" :disabled="!canCancel" :class="[!canCancel ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-red-50']" class="flex-1 py-3 rounded-xl text-sm font-semibold border" style="border-color:#ef4444;color:#ef4444">
+            <button v-if="session.status==='booked'&&!showCancel&&userRole==='student'" @click="showCancel=true" :disabled="!canCancel" :class="[!canCancel ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:bg-red-50']" class="flex-1 py-3 rounded-xl text-sm font-semibold border" style="border-color:#ef4444;color:#ef4444">
               {{ canCancel ? 'Cancel Session' : 'Cancellation Unavailable (< 2h)' }}
             </button>
             <router-link v-if="session.status==='completed'&&userRole==='student'" :to="'/review/'+session.id" class="flex-1 py-3 rounded-xl text-sm font-semibold text-white text-center hover:opacity-90" style="background-color:#4A90D9">Leave a Review</router-link>
