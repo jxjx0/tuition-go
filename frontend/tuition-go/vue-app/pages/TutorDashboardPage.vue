@@ -8,7 +8,7 @@ import { useApi } from '../services/api'
 import { avatarUrl } from '../utils/avatar'
 
 function toUtcDate(d: string) {
-  return new Date(d + 'Z')
+  return new Date(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(d) ? d : d + 'Z')
 }
 
 function fmtDate(d: string) {
