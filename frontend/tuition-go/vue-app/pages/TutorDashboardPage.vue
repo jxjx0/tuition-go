@@ -100,7 +100,7 @@ const { tutor, searchForTutor } = findTutorById()
 
 const sessions = ref<any[]>([])
 const sessionsLoading = ref(false)
-const sessionTab = ref<'booked' | 'available' | 'completed' | 'cancelled'>('booked')
+const sessionTab = ref<'booked' | 'available' | 'completed'>('booked')
 
 async function fetchSessions(id: string) {
   sessionsLoading.value = true
@@ -126,23 +126,35 @@ async function fetchReviews(id: string) {
   }
 }
 
-const bookedSessions = computed(() => sessions.value.filter(s => s.status === 'booked'))
-const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
-const completedSessions = computed(() => sessions.value.filter(s => s.status === 'completed'))
-const cancelledSessions = computed(() => sessions.value.filter(s => s.status === 'cancelled'))
+function isBookedSession(session: any) {
+  const st = (session.status || '').toLowerCase()
+  return st === 'pending' || st === 'booked' || st === 'confirmed'
+}
+
+function isAvailableSession(session: any) {
+  const st = (session.status || '').toLowerCase()
+  return st === 'available'
+}
+
+function isCompletedSession(session: any) {
+  const st = (session.status || '').toLowerCase()
+  return st === 'completed'
+}
+
+const bookedSessions = computed(() => sessions.value.filter(isBookedSession))
+const availableSessions = computed(() => sessions.value.filter(isAvailableSession))
+const completedSessions = computed(() => sessions.value.filter(isCompletedSession))
 
 const sessionTabs = computed(() => [
-  { key: 'booked',     label: 'Booked',     count: bookedSessions.value.length },
-  { key: 'available',  label: 'Available',  count: availableSessions.value.length },
-  { key: 'completed',  label: 'Completed',  count: completedSessions.value.length },
-  { key: 'cancelled',  label: 'Cancelled',  count: cancelledSessions.value.length },
+  { key: 'booked',    label: 'Booked',    count: bookedSessions.value.length },
+  { key: 'available', label: 'Available', count: availableSessions.value.length },
+  { key: 'completed', label: 'Completed', count: completedSessions.value.length },
 ])
 
 const displayedSessions = computed(() => {
-  if (sessionTab.value === 'booked') return bookedSessions.value
   if (sessionTab.value === 'available') return availableSessions.value
   if (sessionTab.value === 'completed') return completedSessions.value
-  return cancelledSessions.value
+  return bookedSessions.value
 })
 
 watch(tutorId, (id) => {
@@ -154,10 +166,10 @@ watch(tutorId, (id) => {
 }, { immediate: true })
 
 const tutorStats = computed(() => [
-  { value: '340', label: 'Total Sessions', bg: '#E8F0FE', iconColor: '#4A90D9' },
-  { value: '$22,100', label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
-  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0', label: 'Average Rating', bg: '#E8F0FE', iconColor: '#4A90D9' },
-  { value: tutor.value?.totalReviews ?? '0', label: 'Total Reviews', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: '340',                                              label: 'Total Sessions', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: '$22,100',                                          label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0',   label: 'Average Rating', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: String(tutor.value?.totalReviews ?? '0'),           label: 'Total Reviews',  bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
 ])
 </script>
 
@@ -259,12 +271,12 @@ const tutorStats = computed(() => [
             <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" :class="session.status==='cancelled'?'opacity-60':''" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
                 <img
-                  :src="avatarUrl(session.status === 'booked' ? session.studentImageUrl : null, session.studentId || 'default')"
+                  :src="avatarUrl(isBookedSession(session) ? session.studentImageUrl : null, session.studentId || 'default')"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div class="flex-1 min-w-0">
                   <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</h3>
-                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ session.status === 'booked' ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
+                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ isBookedSession(session) ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
                   <div class="flex flex-wrap items-center gap-3 mt-2 text-xs" style="color:#1B3A5C;opacity:0.6">
                     <span>{{ fmtDate(session.startTime) }}</span>
                     <span>{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }}</span>
@@ -273,8 +285,11 @@ const tutorStats = computed(() => [
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0 items-end">
                   <span v-if="session.totalPrice" class="text-sm font-bold" style="color:#2EAA4F">${{ session.totalPrice.toFixed(2) }}</span>
-                  <!-- <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="session.status==='booked'?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ session.status==='booked'?'Booked':'Available' }}</span> -->
-                  <a v-if="session.status==='booked'&&session.meetingLink" :href="session.meetingLink" target="_blank" @click.stop class="px-3 py-1.5 rounded-xl text-xs font-semibold text-white hover:opacity-90" style="background-color:#2EAA4F">Join Meeting</a>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                    :style="isBookedSession(session) ? 'background-color:#E8F0FE;color:#4A90D9'
+                          : isCompletedSession(session) ? 'background-color:rgba(124,58,237,0.1);color:#7C3AED'
+                          : 'background-color:rgba(46,170,79,0.1);color:#2EAA4F'"
+                  >{{ isBookedSession(session) ? 'Booked' : isCompletedSession(session) ? 'Completed' : 'Available' }}</span>
                 </div>
               </div>
             </div>
@@ -294,8 +309,8 @@ const tutorStats = computed(() => [
                   <StarRating :modelValue="review.rating" size="sm"/>
                 </div>
               </div>
-              <p class="text-xs leading-relaxed" style="color:#1B3A5C;opacity:0.75;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ review.comment }}</p>
-              <p class="text-xs mt-2" style="color:#1B3A5C;opacity:0.45">{{ new Date(review.createdAt).toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: 'numeric' }) }}</p>
+              <p class="text-xs leading-relaxed" style="color:#1B3A5C;opacity:0.75;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ review.comment }}</p>
+              <p class="text-xs mt-2" style="color:#1B3A5C;opacity:0.45">{{ review.subject }} &middot; {{ fmtDate(review.createdAt) }}</p>
             </div>
             <div v-if="!tutorReviews.length" class="text-center py-8 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
               <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No reviews yet</p>

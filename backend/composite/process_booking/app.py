@@ -49,6 +49,8 @@ class ProcessBooking(Resource):
             json={"stripe_session_id": stripe_session_id},
             timeout=10
         )
+
+        # Verify whether payment was successful.
         if payment_resp.status_code == 402:
             return {"message": "Payment not completed"}, 402
         if payment_resp.status_code != 200:
@@ -87,31 +89,32 @@ class ProcessBooking(Resource):
         tutor_subject_id = session.get("tutorSubjectId")
         start_time = session.get("startTime")
 
-        # 4. Fetch tutor to get their name and Clerk user ID
+        # 4. Fetch tutor to get their name and Clerk user ID (for calendar update) & Fetch tutor subjects to get subject name
         tutor_resp = requests.get(
             f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}",
             timeout=5
         )
+
         if tutor_resp.status_code != 200:
             return {"message": "Failed to retrieve tutor details"}, 500
 
-        tutor_name = tutor_resp.json().get("name", "Tutor")
-        tutor_clerk_id = tutor_resp.json().get("clerkUserId")
+        tutor_data = tutor_resp.json()
 
-        # 5. Fetch tutor subjects to get subject name
-        subjects_resp = requests.get(
-            f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}/subjects",
-            timeout=5
-        )
+        # Extract basic info
+        tutor_name = tutor_data.get("name", "Tutor")
+        tutor_clerk_id = tutor_data.get("clerkUserId")
+
+        # Extract subject name
         subject_name = "Tutoring Session"
-        if subjects_resp.status_code == 200:
-            subjects = subjects_resp.json()
-            matching = next(
-                (s for s in subjects if s.get("tutorSubjectId") == tutor_subject_id),
-                None
-            )
-            if matching:
-                subject_name = matching.get("subject", "Tutoring Session")
+        subjects = tutor_data.get("subjects", [])
+
+        matching = next(
+            (s for s in subjects if s.get("tutorSubjectId") == tutor_subject_id),
+            None
+        )
+
+        if matching:
+            subject_name = matching.get("subject", "Tutoring Session")
 
         # 6. Fetch student email and name using their Clerk ID
         student_resp = requests.get(
@@ -127,10 +130,14 @@ class ProcessBooking(Resource):
         if not student_email:
             return {"message": "Student email not found"}, 500
 
-        # 7. Update session status to booked and assign student
+        # 7. Update session status to booked, assign student, and store Stripe session ID for future refunds
+        update_payload = {"status": "booked", "studentId": student_id}
+        if stripe_session_id:
+            update_payload["stripeSessionId"] = stripe_session_id
+
         update_resp = requests.put(
             f"{SESSION_SERVICE_URL}/session/{session_id}",
-            json={"status": "booked", "studentId": student_id},
+            json=update_payload,
             headers={"Authorization": auth_header},
             timeout=5
         )
@@ -149,6 +156,7 @@ class ProcessBooking(Resource):
                 headers={"Authorization": auth_header},
                 timeout=10
             )
+            # If calendar update FAILS
             if calendar_resp.status_code != 200:
                 # Non-fatal — session is booked, calendar update failed
                 return {
@@ -164,6 +172,7 @@ class ProcessBooking(Resource):
                     "status": "booked",
                     "calendarError": calendar_resp.json().get("error")
                 }, 207
+        # If NO calendar event exists
         else:
             return {
                 "message": "Booking confirmed but no calendar event linked to this session",
@@ -178,6 +187,7 @@ class ProcessBooking(Resource):
                 "status": "booked"
             }, 200
 
+        # If everything works
         return {
             "message": "Booking confirmed and calendar updated",
             "sessionId": session_id,

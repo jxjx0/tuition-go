@@ -41,6 +41,7 @@ session_model = api.model('Session', {
     'durationMins': fields.Float(description='The duration of the session in minutes'),
     'meetingLink': fields.String(description='The meeting link'),
     'calendarEventId': fields.String(description='The Google Calendar event ID'),
+    'stripeSessionId': fields.String(description='The Stripe Checkout Session ID for refund tracking'),
     'createdAt': fields.DateTime(description='The creation timestamp'),
     'updatedAt': fields.DateTime(description='The last update timestamp')
 })
@@ -61,10 +62,12 @@ session_update_model = api.model('SessionUpdate', {
     'tutorSubjectId': fields.String(description='The tutor subject UUID (references TutorSubjects table)', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
     'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
     'endTime': fields.DateTime(description='The session end time', example='2028-03-03T11:00:00.000Z'),
-    'status': fields.String(description='The session status', example='booked'),
+    'status': fields.String(description='The session status', example='confirmed'),
+    'studentId': fields.String(description='The student UUID — set to null to clear', example='b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'),
     'durationMins': fields.Float(description='The duration of the session in minutes', example=90),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
     'calendarEventId': fields.String(description='The Google Calendar event ID', example='abc123xyz'),
+    'stripeSessionId': fields.String(description='The Stripe Checkout Session ID for refund tracking', example='cs_test_abc123'),
 })
 
 
@@ -128,13 +131,33 @@ class SessionDetail(Resource):
     @api.expect(session_update_model)
     @api.marshal_with(session_model)
     def put(self, sessionId):
-        """Update a session record."""
+        """Update a session record. Null values are explicitly applied (e.g. to clear studentId)."""
         data = request.get_json()
         try:
-            response = supabase.table('Session').update(data).eq('sessionId', sessionId).execute()
-            if response.data:
-                return response.data[0], 200
-            return {'message': 'Session not found for update'}, 404
+            # Supabase Python client skips None values in .update(), so we must
+            # separate the payload: non-null fields are updated normally, and
+            # null fields are explicitly set via a second update call.
+            non_null = {k: v for k, v in data.items() if v is not None}
+            null_keys = [k for k, v in data.items() if v is None]
+
+            # Apply non-null updates first (or all fields if no nulls)
+            if non_null:
+                response = supabase.table('Session').update(non_null).eq('sessionId', sessionId).execute()
+                if not response.data:
+                    return {'message': 'Session not found for update'}, 404
+
+            # Explicitly clear null fields using a raw dict with None preserved
+            if null_keys:
+                null_payload = {k: None for k in null_keys}
+                response = supabase.table('Session').update(null_payload).eq('sessionId', sessionId).execute()
+                if not response.data:
+                    return {'message': 'Session not found when clearing fields'}, 404
+
+            # Return the latest state
+            final = supabase.table('Session').select('*').eq('sessionId', sessionId).execute()
+            if final.data:
+                return final.data[0], 200
+            return {'message': 'Session not found after update'}, 404
         except Exception as e:
             return {'message': 'Failed to update session', 'error': str(e)}, 500
 

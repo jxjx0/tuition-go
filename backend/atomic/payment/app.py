@@ -28,17 +28,6 @@ class GetConfig(Resource):
             "publishable_key": os.environ["STRIPE_PUBLISHABLE_KEY"],
         })
 
-# @api.route("/create-payment-intent")
-# class CreateCheckoutSession(Resource):
-#     def post(self):
-#         data = request.get_json()
-#         intent = stripe.PaymentIntent.create(
-#             amount=data["amount"],
-#             currency="sgd",
-#             metadata={"booking_id": data["booking_id"]}
-#         )
-#         return jsonify({"client_secret": intent.client_secret})
-
 @api.route("/create-checkout-session")
 class CreateCheckoutSession(Resource):
     def post(self):
@@ -93,6 +82,40 @@ class VerifyPayment(Resource):
             "tutor_id":   metadata.get("tutor_id"),
             "amount_total": stripe_session.amount_total,
         }, 200
+
+
+@api.route("/refund")
+class ProcessRefund(Resource):
+    def post(self):
+        """Process a full refund for a cancelled session via Stripe."""
+        data = request.get_json()
+        stripe_session_id = data.get("stripe_session_id")
+        if not stripe_session_id:
+            return {"message": "stripe_session_id is required"}, 400
+
+        try:
+            # Retrieve Stripe Checkout Session to get the payment_intent ID
+            stripe_session = stripe.checkout.Session.retrieve(stripe_session_id)
+            payment_intent_id = stripe_session.payment_intent
+
+            if not payment_intent_id:
+                return {"message": "No payment intent found for this Stripe session"}, 400
+
+            # Create a full refund against the payment intent
+            refund = stripe.Refund.create(payment_intent=payment_intent_id)
+
+            return {
+                "refund_status": refund.status,
+                "refund_id": refund.id,
+                "amount": refund.amount,
+            }, 200
+
+        except stripe.error.InvalidRequestError as e:
+            return {"message": f"Invalid Stripe request: {str(e)}"}, 400
+        except stripe.error.StripeError as e:
+            return {"message": f"Stripe error: {str(e)}"}, 502
+        except Exception as e:
+            return {"message": f"Failed to process refund: {str(e)}"}, 500
 
 
 @api.route("/health")
