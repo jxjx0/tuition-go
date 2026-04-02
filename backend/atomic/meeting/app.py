@@ -7,7 +7,8 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Meeting Service",
     version="1.0",
-    description="Meeting atomic service"
+    description="Meeting atomic service",
+    prefix="/meeting"
 )
 
 

@@ -12,21 +12,24 @@ load_dotenv()
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 
-supabase: Client = create_client(url, key)
+
+def get_supabase() -> Client:
+    return create_client(url, key)
 
 app = Flask(__name__)
 CORS(app)
 api = Api(app, doc="/docs",
     title="Student Service",
     version="1.0",
-    description="Student atomic service"
+    description="Student atomic service",
+    prefix="/student"
 )
 
 
 # POST register/create student
 # Called once after Clerk sign-up to persist the student record in Supabase.
 # Frontend should then store the returned studentId in Clerk unsafeMetadata.
-@api.route("/student/register")
+@api.route("/register")
 class StudentRegister(Resource):
 
     def post(self):
@@ -43,9 +46,11 @@ class StudentRegister(Resource):
         if not name or not email or not clerk_user_id:
             return {"error": "name, email, and clerkUserId are required"}, 400
 
+        db = get_supabase()
+
         # Check if a student with this clerkUserId already exists
         existing = (
-            supabase
+            db
             .table("Student")
             .select("studentId")
             .eq("clerkUserId", clerk_user_id)
@@ -57,7 +62,7 @@ class StudentRegister(Resource):
 
         # Check if email already taken by another student
         email_check = (
-            supabase
+            db
             .table("Student")
             .select("studentId")
             .eq("email", email)
@@ -77,7 +82,7 @@ class StudentRegister(Resource):
             student_data["phone"] = phone
 
         try:
-            response = supabase.table("Student").insert(student_data).execute()
+            response = db.table("Student").insert(student_data).execute()
             return response.data[0], 201
 
         except Exception as e:
@@ -86,12 +91,12 @@ class StudentRegister(Resource):
 
 
 # GET student by studentId
-@api.route("/student/<string:studentId>")
+@api.route("/<string:studentId>")
 class StudentById(Resource):
     def get(self, studentId):
         try:
             response = (
-                supabase
+                get_supabase()
                 .table("Student")
                 .select("studentId, name, email, phone, imageURL, createdAt, updatedAt")
                 .eq("studentId", studentId)
@@ -136,15 +141,16 @@ class StudentById(Resource):
                 file_ext = file.filename.split(".")[-1]
                 file_path = f"{studentId}_student/{uuid.uuid4()}.{file_ext}"
 
+                db = get_supabase()
                 # Upload to Supabase Storage
-                supabase.storage.from_("tuitiongo").upload(
+                db.storage.from_("tuitiongo").upload(
                     file_path,
                     file.read(),
                     {"content-type": file.content_type}
                 )
 
                 # Get public URL
-                public_url = supabase.storage.from_("tuitiongo").get_public_url(file_path)
+                public_url = db.storage.from_("tuitiongo").get_public_url(file_path)
 
                 update_data["imageURL"] = public_url
 
@@ -156,7 +162,7 @@ class StudentById(Resource):
 
             # Update Student table
             response = (
-                supabase
+                get_supabase()
                 .table("Student")
                 .update(update_data)
                 .eq("studentId", studentId)
@@ -181,7 +187,7 @@ class StudentById(Resource):
     def delete(self, studentId):
         try:
             response = (
-                supabase
+                get_supabase()
                 .table("Student")
                 .delete()
                 .eq("studentId", studentId)
@@ -200,13 +206,13 @@ class StudentById(Resource):
 
 # GET student by Clerk user ID
 # Used to look up a student record when only the Clerk session is available.
-@api.route("/student/by-clerk/<string:clerkUserId>")
+@api.route("/by-clerk/<string:clerkUserId>")
 class StudentByClerkId(Resource):
 
     def get(self, clerkUserId):
         try:
             response = (
-                supabase
+                get_supabase()
                 .table("Student")
                 .select("studentId, name, email, phone, imageURL, createdAt, updatedAt")
                 .eq("clerkUserId", clerkUserId)

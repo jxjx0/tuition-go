@@ -9,25 +9,25 @@ export function useStudentService() {
 
   return {
     register(payload: { name: string; email: string; clerkUserId: string; phone?: string }) {
-      return api.post('/students/student/register', payload)
+      return api.post('/students/register', payload)
     },
 
     getById(studentId: string) {
-      return api.get(`/students/student/${studentId}`)
+      return api.get(`/students/${studentId}`)
     },
 
     getByClerkId(clerkUserId: string) {
-      return api.get(`/students/student/by-clerk/${clerkUserId}`)
+      return api.get(`/students/by-clerk/${clerkUserId}`)
     },
 
     update(studentId: string, formData: FormData) {
-      return api.put(`/students/student/${studentId}`, formData, {
+      return api.put(`/students/${studentId}`, formData, {
         headers: { 'Content-Type': undefined },
       })
     },
 
     remove(studentId: string) {
-      return api.delete(`/students/student/${studentId}`)
+      return api.delete(`/students/${studentId}`)
     },
   }
 }

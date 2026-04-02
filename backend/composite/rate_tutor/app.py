@@ -7,7 +7,8 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Rate Tutor Service",
     version="1.0",
-    description="Rate Tutor composite service"
+    description="Rate Tutor composite service",
+    prefix="/rate-tutor"
 )
 
 

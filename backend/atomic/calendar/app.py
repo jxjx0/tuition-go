@@ -1,20 +1,19 @@
 import os
-import datetime
 import uuid
+import jwt as pyjwt
+import requests as http_requests
 from flask import Flask, request
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 
-from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from dotenv import load_dotenv
 
 import logging
 import sys
 
-# Configure logging to output to stdout for Docker
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -22,18 +21,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# If modifying these scopes, delete the file token.json.
+load_dotenv()
+
+CLERK_SECRET_KEY = os.environ.get("CLERK_SECRET_KEY", "")
+
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/calendar.readonly"
 ]
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization", "X-Google-Token", "X-User-Email"]}})
+CORS(app, resources={r"/*": {"origins": "*", "allow_headers": ["Content-Type", "Authorization"]}})
 api = Api(app, doc="/docs",
     title="Calendar Service",
     version="1.0",
-    description="Calendar atomic service"
+    description="Calendar atomic service",
+    prefix="/calendar"
 )
 
 meeting_model = api.model('MeetingRequest', {
@@ -45,102 +48,76 @@ meeting_model = api.model('MeetingRequest', {
     'attendees': fields.List(fields.String, description='List of attendee emails')
 })
 
-# Determine the directory where this script is located
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
-TOKEN_PATH = os.path.join(BASE_DIR, "token.json")
+update_meeting_model = api.model('UpdateMeetingRequest', {
+    'eventId': fields.String(required=True, description='Google Calendar event ID to update'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+    'studentEmail': fields.String(required=True, description='Student email to add as attendee'),
+})
 
-def get_calendar_service(access_token=None):
-    creds = None
-    
-    # If a direct access token is provided (pass-through from Clerk), use it
-    if access_token:
-        logger.info("Using provided access token from Clerk...")
-        creds = Credentials(token=access_token)
-    
-    # Otherwise check for local token.json
-    if not creds:
-        logger.info(f"Checking for token at {TOKEN_PATH}")
-        if os.path.exists(TOKEN_PATH):
-            logger.info("Token found. Loading credentials...")
-            creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
-    
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            logger.info("Token expired. Refreshing...")
-            creds.refresh(Request())
-        else:
-            logger.info("No valid credentials. Starting OAuth flow...")
-            # ... (rest of the OAuth flow code)
-            if not os.path.exists(CREDENTIALS_PATH):
-                raise Exception(f"credentials.json not found at {CREDENTIALS_PATH}")
-            
-            # Enable insecure transport for local development (http instead of https)
-            os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-            
-            flow = InstalledAppFlow.from_client_secrets_file(
-                CREDENTIALS_PATH, SCOPES
-            )
-            
-            # Use 127.0.0.1 instead of localhost (Google prefers IPs for local secure flows now)
-            # Remove trailing slash to match some strict redirect URI policies
-            flow.redirect_uri = 'http://127.0.0.1:5080'
-            auth_url, _ = flow.authorization_url(prompt='consent', access_type='offline')
-            
-            logger.info("=" * 50)
-            logger.info("AUTHENTICATION REQUIRED")
-            logger.info(f"Please visit this URL: {auth_url}")
-            logger.info("=" * 50)
-            
-            from google_auth_oauthlib.flow import _WSGIRequestHandler, _RedirectWSGIApp
-            import wsgiref.simple_server
-            
-            wsgi_app = _RedirectWSGIApp("Success! You have authenticated. You can close this tab.")
-            try:
-                local_server = wsgiref.simple_server.make_server(
-                    '0.0.0.0', 5080, wsgi_app, handler_class=_WSGIRequestHandler)
-            except OSError as e:
-                if e.errno == 98:
-                    logger.error("Port 5080 is already in use. Another authentication process may be running.")
-                    raise Exception("Authentication port 5080 is busy. Please wait a moment and try again.")
-                raise e
-            
-            logger.info("Waiting for your browser to redirect to port 5080...")
-            
-            # Robust loop: keep handling requests until we actually get the callback
-            # This prevents crashing on background requests like favicon.ico
-            while wsgi_app.last_request_uri is None:
-                local_server.handle_request()
-            
-            logger.info("Callback received! Finalizing token...")
-            
-            # Fetch the token. We replace http with https for the library's internal check.
-            authorization_response = wsgi_app.last_request_uri.replace('http://', 'https://')
-            flow.fetch_token(authorization_response=authorization_response)
-            creds = flow.credentials
-        
-        logger.info(f"Saving new token to {TOKEN_PATH}")
-        with open(TOKEN_PATH, "w") as token:
-            token.write(creds.to_json())
+delete_meeting_model = api.model('DeleteMeetingRequest', {
+    'eventId':      fields.String(required=True, description='Google Calendar event ID to delete'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+})
 
+cancel_meeting_model = api.model('CancelMeetingRequest', {
+    'eventId':      fields.String(required=True, description='Google Calendar event ID to update'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+    'studentEmail': fields.String(required=True, description='Student email to remove as attendee'),
+})
+
+reschedule_meeting_model = api.model('RescheduleMeetingRequest', {
+    'eventId':      fields.String(required=True, description='Google Calendar event ID to reschedule'),
+    'tutorClerkId': fields.String(required=True, description='Clerk user ID of the tutor (user_xxx)'),
+    'summary':      fields.String(description='New event title'),
+    'start_time':   fields.String(required=True, description='New start time in ISO format'),
+    'end_time':     fields.String(required=True, description='New end time in ISO format'),
+    'timezone':     fields.String(description='Timezone (e.g. Asia/Singapore)', default='UTC'),
+})
+
+
+def get_google_token_for_user(clerk_user_id: str) -> str:
+    """Fetches the user's Google OAuth token from Clerk's Backend API."""
+    url = f"https://api.clerk.com/v1/users/{clerk_user_id}/oauth_access_tokens/google"
+    resp = http_requests.get(url, headers={"Authorization": f"Bearer {CLERK_SECRET_KEY}"})
+    resp.raise_for_status()
+    data = resp.json()
+    if not data:
+        raise Exception("No Google OAuth token found for this user. Have they signed in with Google via Clerk?")
+    return data[0]["token"]
+
+
+def get_calendar_service(clerk_user_id: str):
+    """Builds a Google Calendar API service using a Clerk user's OAuth token."""
+    logger.info(f"Fetching Google token from Clerk for user {clerk_user_id}...")
+    token = get_google_token_for_user(clerk_user_id)
+    creds = Credentials(token=token)
     return build("calendar", "v3", credentials=creds)
+
 
 @api.route("/health")
 class Health(Resource):
     def get(self):
         return {"status": "healthy", "service": "calendar"}, 200
 
+
 @api.route("/create-meeting")
 class CreateMeeting(Resource):
     @api.expect(meeting_model)
     def post(self):
         """Creates a Google Calendar event with a Google Meet link."""
+        # Extract Clerk user ID from the JWT — Kong already validated the signature
+        auth_header = request.headers.get("Authorization", "")
+        token = auth_header.replace("Bearer ", "")
+        try:
+            claims = pyjwt.decode(token, options={"verify_signature": False})
+            clerk_user_id = claims.get("sub")
+        except Exception:
+            return {"error": "Invalid authorization token"}, 401
+
+        if not clerk_user_id:
+            return {"error": "Could not identify user from token"}, 401
+
         data = request.json
-        
-        # Check for Google Access Token and Backup Email from Clerk in headers
-        access_token = request.headers.get('X-Google-Token')
-        backup_email = request.headers.get('X-User-Email')
-        
         summary = data.get('summary', 'Tutor Session')
         description = data.get('description', 'Generated by Tuition-Go')
         start_time = data.get('start_time')
@@ -152,53 +129,34 @@ class CreateMeeting(Resource):
             return {"error": "start_time and end_time are required"}, 400
 
         try:
-            logger.info(f"Fetching calendar service (token from header: {bool(access_token)})...")
-            service = get_calendar_service(access_token=access_token)
-            logger.info("Service obtained. Fetching traveler identity...")
-            
-            # Build attendees list
+            service = get_calendar_service(clerk_user_id=clerk_user_id)
+        except Exception as e:
+            logger.error(f"Failed to get calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
             final_attendees = [{'email': email} for email in attendee_emails]
-            
-            # Fetch user email to ensure they are the host (if possible)
+
             try:
-                user_email = None
-                if backup_email:
-                    logger.info(f"Using backup email from header: {backup_email}")
-                    user_email = backup_email
-                else:
-                    logger.info("Fetching user identity from Google API...")
-                    # Note: this might still fail if calendar.readonly scope is missing from token.json
-                    primary_calendar = service.calendars().get(calendarId='primary').execute()
-                    user_email = primary_calendar.get('id')
-                
+                primary_calendar = service.calendars().get(calendarId='primary').execute()
+                user_email = primary_calendar.get('id')
                 if user_email:
-                    logger.info(f"Establishing host: {user_email}")
-                    # Ensure host is included and "accepted"
                     host_added = False
                     for att in final_attendees:
                         if att['email'].lower() == user_email.lower():
                             att['responseStatus'] = 'accepted'
                             host_added = True
                             break
-                    
                     if not host_added:
                         final_attendees.append({'email': user_email, 'responseStatus': 'accepted'})
             except Exception as ident_err:
                 logger.warning(f"Could not establish host identity: {ident_err}")
-                # We proceed with original attendees if we can't get identity
 
-            # Use the data precisely as received
             event = {
                 'summary': summary,
                 'description': description,
-                'start': {
-                    'dateTime': start_time,
-                    'timeZone': timezone,
-                },
-                'end': {
-                    'dateTime': end_time,
-                    'timeZone': timezone,
-                },
+                'start': {'dateTime': start_time, 'timeZone': timezone},
+                'end': {'dateTime': end_time, 'timeZone': timezone},
                 'attendees': final_attendees,
                 'conferenceData': {
                     'createRequest': {
@@ -209,8 +167,8 @@ class CreateMeeting(Resource):
             }
 
             event = service.events().insert(
-                calendarId='primary', 
-                body=event, 
+                calendarId='primary',
+                body=event,
                 conferenceDataVersion=1
             ).execute()
             logger.info("Event created successfully!")
@@ -228,6 +186,260 @@ class CreateMeeting(Resource):
         except Exception as e:
             logger.exception("General Error occurred during meeting creation")
             return {"error": str(e)}, 500
+
+
+@api.route("/update-meeting")
+class UpdateMeeting(Resource):
+    @api.expect(update_meeting_model)
+    def post(self):
+        """Adds a student as attendee to an existing tutor calendar event."""
+        data = request.json
+        event_id = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+        student_email = data.get('studentEmail')
+
+        if not event_id or not tutor_clerk_id or not student_email:
+            return {"error": "eventId, tutorClerkId and studentEmail are required"}, 400
+
+        # Use the TUTOR's Google token — the student made the HTTP request
+        # but we update the tutor's calendar
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get tutor calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            # Fetch the existing event from tutor's calendar
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+
+            # Add student to attendees if not already present
+            attendees = event.get('attendees', [])
+            already_added = any(a.get('email', '').lower() == student_email.lower() for a in attendees)
+            if not already_added:
+                attendees.append({'email': student_email})
+                event['attendees'] = attendees
+
+            # Update event title to reflect booking
+            event['summary'] = event.get('summary', 'Tutor Session').replace('(Pending)', '(Booked)')
+
+            updated_event = service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event,
+                sendUpdates='all'  # emails invite to student automatically
+            ).execute()
+
+            logger.info(f"Event {event_id} updated with student {student_email}")
+            return {
+                "message": "Meeting updated successfully",
+                "eventId": updated_event.get('id'),
+                "hangoutLink": updated_event.get('hangoutLink')
+            }, 200
+
+        except HttpError as error:
+            logger.error(f"HTTP Error updating event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error updating meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/cancel-meeting")
+class CancelMeeting(Resource):
+    @api.expect(cancel_meeting_model)
+    def post(self):
+        """Removes a student as attendee from an existing tutor calendar event and marks it as Pending."""
+        data = request.json
+        event_id = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+        student_email = data.get('studentEmail')
+
+        if not event_id or not tutor_clerk_id or not student_email:
+            return {"error": "eventId, tutorClerkId and studentEmail are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get tutor calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            # Fetch current event from tutor's calendar
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+
+            # Remove student from attendees list
+            attendees = event.get('attendees', [])
+            attendees = [a for a in attendees if a.get('email', '').lower() != student_email.lower()]
+            event['attendees'] = attendees
+
+            # Revert title back to Pending so tutor knows the slot is free
+            event['summary'] = event.get('summary', 'Tutor Session').replace('(Booked)', '(Pending)')
+
+            updated_event = service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event,
+                sendUpdates='all'  # automatically emails cancellation notice to student
+            ).execute()
+
+            logger.info(f"Event {event_id}: student {student_email} removed from attendees")
+            return {
+                "message": "Student removed from calendar event successfully",
+                "eventId": updated_event.get('id'),
+            }, 200
+
+        except HttpError as error:
+            logger.error(f"HTTP Error cancelling event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error cancelling meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/cancel-meeting")
+class CancelMeeting(Resource):
+    @api.expect(cancel_meeting_model)
+    def post(self):
+        """Removes a student attendee from an existing tutor calendar event (on cancellation)."""
+        data = request.json
+        event_id       = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+        student_email  = data.get('studentEmail')
+
+        if not event_id or not tutor_clerk_id or not student_email:
+            return {"error": "eventId, tutorClerkId and studentEmail are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get tutor calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            # Fetch current event from tutor's calendar
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+
+            # Remove student from attendees list
+            attendees = event.get('attendees', [])
+            attendees = [a for a in attendees if a.get('email', '').lower() != student_email.lower()]
+            event['attendees'] = attendees
+
+            # Revert title back to indicate the slot is free again
+            event['summary'] = event.get('summary', 'Tutor Session').replace('(Booked)', '(Available)')
+
+            updated_event = service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event,
+                sendUpdates='all'  # automatically sends cancellation notice to student
+            ).execute()
+
+            logger.info(f"Event {event_id}: student {student_email} removed from attendees")
+            return {
+                "message": "Student removed from calendar event successfully",
+                "eventId": updated_event.get('id'),
+            }, 200
+
+        except HttpError as error:
+            logger.error(f"HTTP Error cancelling event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error cancelling meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/delete-meeting")
+class DeleteMeeting(Resource):
+    @api.expect(delete_meeting_model)
+    def post(self):
+        """Deletes a Google Calendar event using the tutor's OAuth token. Notifies all attendees."""
+        data = request.json
+        event_id       = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+
+        if not event_id or not tutor_clerk_id:
+            return {"error": "eventId and tutorClerkId are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            service.events().delete(
+                calendarId='primary',
+                eventId=event_id,
+                sendUpdates='all'
+            ).execute()
+
+            logger.info(f"Event {event_id} deleted")
+            return {"message": "Meeting deleted successfully"}, 200
+
+        except HttpError as error:
+            if error.resp.status == 410:
+                # Already deleted — treat as success
+                logger.warning(f"Event {event_id} already deleted (410 Gone)")
+                return {"message": "Meeting already deleted"}, 200
+            logger.error(f"HTTP Error deleting event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error deleting meeting")
+            return {"error": str(e)}, 500
+
+
+@api.route("/reschedule-meeting")
+class RescheduleMeeting(Resource):
+    @api.expect(reschedule_meeting_model)
+    def post(self):
+        """Updates an existing Google Calendar event's time and/or title."""
+        data = request.json
+        event_id      = data.get('eventId')
+        tutor_clerk_id = data.get('tutorClerkId')
+        start_time    = data.get('start_time')
+        end_time      = data.get('end_time')
+        timezone      = data.get('timezone', 'UTC')
+        summary       = data.get('summary')
+
+        if not event_id or not tutor_clerk_id or not start_time or not end_time:
+            return {"error": "eventId, tutorClerkId, start_time and end_time are required"}, 400
+
+        try:
+            service = get_calendar_service(clerk_user_id=tutor_clerk_id)
+        except Exception as e:
+            logger.error(f"Failed to get calendar service: {e}")
+            return {"error": str(e)}, 401
+
+        try:
+            event = service.events().get(calendarId='primary', eventId=event_id).execute()
+
+            event['start'] = {'dateTime': start_time, 'timeZone': timezone}
+            event['end']   = {'dateTime': end_time,   'timeZone': timezone}
+            if summary:
+                event['summary'] = summary
+
+            updated_event = service.events().update(
+                calendarId='primary',
+                eventId=event_id,
+                body=event,
+                sendUpdates='all'
+            ).execute()
+
+            logger.info(f"Event {event_id} rescheduled")
+            return {
+                "message": "Meeting rescheduled successfully",
+                "eventId": updated_event.get('id'),
+                "hangoutLink": updated_event.get('hangoutLink')
+            }, 200
+
+        except HttpError as error:
+            logger.error(f"HTTP Error rescheduling event: {error}")
+            return {"error": f"An error occurred: {error}"}, 500
+        except Exception as e:
+            logger.exception("General error rescheduling meeting")
+            return {"error": str(e)}, 500
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5005, debug=True)

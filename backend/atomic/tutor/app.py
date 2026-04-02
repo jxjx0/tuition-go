@@ -25,12 +25,14 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Tutor Service",
     version="1.0",
-    description="Tutor atomic service"
+    description="Tutor atomic service",
+    #All routes in this API will automatically start with /tutor, http://localhost:5002/tutor
+    prefix="/tutor"
 )
 
 
 #GET all tutors
-@api.route("/tutors")
+@api.route("/all")
 class Tutors(Resource):
     def get(self):
         tutors = supabase.table("Tutor") .select("*").order("createdAt", desc=True).execute()
@@ -42,7 +44,7 @@ class Tutors(Resource):
 # GET /tutors/search?academicLevel=Secondary 4
 # GET http://127.0.0.1:5002/tutors/search?subject=English&academicLevel=Secondary+4&sort=priceLowHigh
 # GET /tutors/search?name=vincent
-@api.route("/tutors/search")
+@api.route("/search")
 class SearchTutors(Resource):
     def get(self):
 
@@ -130,6 +132,7 @@ class SearchTutors(Resource):
             return tutor_list, 200
 
         except Exception as e:
+            print(f"Search error: {str(e)}")
             return {"error": str(e)}, 500
 
 #GET subjects taught by tutor with filter subject and/or academic level and/or sort and/or tutor name (includes price sorting)
@@ -198,7 +201,7 @@ class SearchTutors(Resource):
 #             return {"error": str(e)}, 500
 
 #GET particular tutor with id
-@api.route("/tutor/<string:tutorID>")
+@api.route("/<string:tutorID>")
 class GetTutorById(Resource):
     def get(self, tutorID):
         try:
@@ -206,6 +209,7 @@ class GetTutorById(Resource):
                 supabase.table("Tutor")
                 .select("""
                     tutorId,
+                    clerkUserId,
                     name,
                     email,
                     phone,
@@ -235,7 +239,7 @@ class GetTutorById(Resource):
 
 
 #POST register/create tutor
-@api.route("/tutor/register")
+@api.route("/register")
 class TutorRegister(Resource):
     def post(self):
         data = request.get_json()
@@ -315,7 +319,7 @@ class TutorRegister(Resource):
 
 #PUT update tutor info
 #Accept file from frontend (multipart/form-data)
-@api.route("/tutor/<string:tutorID>")
+@api.route("/<string:tutorID>")
 class UpdateTutor(Resource):
 
     def put(self, tutorID):
@@ -388,7 +392,7 @@ class UpdateTutor(Resource):
 
 
 #DELETE delete tutor user
-@api.route("/tutor/<string:tutorID>")
+@api.route("/<string:tutorID>")
 class DeleteTutor(Resource):
 
     def delete(self, tutorID):
@@ -408,7 +412,7 @@ class DeleteTutor(Resource):
 
 #PUT update reviews portion of tutor
 # get the new review from the student & calculate what is the new no. of review and average rating 
-@api.route("/tutor/updateRating")
+@api.route("/updateRating")
 class UpdateTutorRating(Resource):
 
 
@@ -465,7 +469,7 @@ class UpdateTutorRating(Resource):
 
 
 #POST create new subject that the tutor teaches
-@api.route("/tutor/<string:tutorId>/subjects")
+@api.route("/<string:tutorId>/subjects")
 class TutorAddSubject(Resource):
 
 
@@ -544,7 +548,7 @@ class TutorAddSubject(Resource):
 
 
 #GET get subjects tutor is teaching
-@api.route("/tutor/<string:tutorId>/subjects")
+@api.route("/<string:tutorId>/subjects")
 class TutorSubjects(Resource):
     def get(self, tutorId):
         try:
@@ -557,7 +561,7 @@ class TutorSubjects(Resource):
 
 
 #PUT update subject that the tutor teaches
-@api.route("/tutor/<string:tutorId>/subjects/<string:subjectId>")
+@api.route("/<string:tutorId>/subjects/<string:subjectId>")
 class UpdateTutorSubject(Resource):
 
 
@@ -593,7 +597,7 @@ class UpdateTutorSubject(Resource):
 
 
 #DELETE delete subject that the tutor taught
-@api.route("/tutor/<string:tutorId>/subjects/<string:subjectId>")
+@api.route("/<string:tutorId>/subjects/<string:subjectId>")
 class DeleteTutorSubject(Resource):
 
     def delete(self, tutorId, subjectId):

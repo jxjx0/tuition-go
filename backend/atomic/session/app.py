@@ -5,6 +5,7 @@ from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
 from postgrest.exceptions import APIError
+from datetime import datetime, timezone
 
 
 load_dotenv()
@@ -14,7 +15,8 @@ CORS(app)
 api = Api(app, doc="/docs",
     title="Session Service",
     version="1.0",
-    description="Session atomic service"
+    description="Session atomic service",
+    prefix="/session"
 )
 
 # Supabase setup
@@ -38,6 +40,8 @@ session_model = api.model('Session', {
     'status': fields.String(description='The session status'),
     'durationMins': fields.Float(description='The duration of the session in minutes'),
     'meetingLink': fields.String(description='The meeting link'),
+    'calendarEventId': fields.String(description='The Google Calendar event ID'),
+    'stripeSessionId': fields.String(description='The Stripe Checkout Session ID for refund tracking'),
     'createdAt': fields.DateTime(description='The creation timestamp'),
     'updatedAt': fields.DateTime(description='The last update timestamp')
 })
@@ -51,6 +55,7 @@ session_input_model = api.model('SessionInput', {
     'status': fields.String(description='The session status', example='pending'),
     'durationMins': fields.Float(description='The duration of the session in minutes', example=60),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
+    'calendarEventId': fields.String(description='The Google Calendar event ID', example='abc123xyz'),
 })
 
 session_update_model = api.model('SessionUpdate', {
@@ -58,8 +63,11 @@ session_update_model = api.model('SessionUpdate', {
     'startTime': fields.DateTime(description='The session start time', example='2027-03-03T10:00:00.000Z'),
     'endTime': fields.DateTime(description='The session end time', example='2028-03-03T11:00:00.000Z'),
     'status': fields.String(description='The session status', example='confirmed'),
+    'studentId': fields.String(description='The student UUID — set to null to clear', example='b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'),
     'durationMins': fields.Float(description='The duration of the session in minutes', example=90),
     'meetingLink': fields.String(description='The meeting link', example='https://meet.google.com/abc-defg-hij'),
+    'calendarEventId': fields.String(description='The Google Calendar event ID', example='abc123xyz'),
+    'stripeSessionId': fields.String(description='The Stripe Checkout Session ID for refund tracking', example='cs_test_abc123'),
 })
 
 
@@ -105,8 +113,8 @@ class CreateSession(Resource):
             return {'message': 'Failed to create session', 'error': str(e)}, 500
 
 
-@api.route('/session/<string:sessionId>')
-class SessionResource(Resource):
+@api.route("/<string:sessionId>")
+class SessionDetail(Resource):
 
     @api.marshal_with(session_model)
     def get(self, sessionId):
@@ -123,13 +131,33 @@ class SessionResource(Resource):
     @api.expect(session_update_model)
     @api.marshal_with(session_model)
     def put(self, sessionId):
-        """Update a session record."""
+        """Update a session record. Null values are explicitly applied (e.g. to clear studentId)."""
         data = request.get_json()
         try:
-            response = supabase.table('Session').update(data).eq('sessionId', sessionId).execute()
-            if response.data:
-                return response.data[0], 200
-            return {'message': 'Session not found for update'}, 404
+            # Supabase Python client skips None values in .update(), so we must
+            # separate the payload: non-null fields are updated normally, and
+            # null fields are explicitly set via a second update call.
+            non_null = {k: v for k, v in data.items() if v is not None}
+            null_keys = [k for k, v in data.items() if v is None]
+
+            # Apply non-null updates first (or all fields if no nulls)
+            if non_null:
+                response = supabase.table('Session').update(non_null).eq('sessionId', sessionId).execute()
+                if not response.data:
+                    return {'message': 'Session not found for update'}, 404
+
+            # Explicitly clear null fields using a raw dict with None preserved
+            if null_keys:
+                null_payload = {k: None for k in null_keys}
+                response = supabase.table('Session').update(null_payload).eq('sessionId', sessionId).execute()
+                if not response.data:
+                    return {'message': 'Session not found when clearing fields'}, 404
+
+            # Return the latest state
+            final = supabase.table('Session').select('*').eq('sessionId', sessionId).execute()
+            if final.data:
+                return final.data[0], 200
+            return {'message': 'Session not found after update'}, 404
         except Exception as e:
             return {'message': 'Failed to update session', 'error': str(e)}, 500
 
@@ -144,7 +172,59 @@ class SessionResource(Resource):
         except APIError as e:
             return {'message': 'Failed to delete session', 'error': str(e)}, 500
 
-@api.route('/sessions')
+complete_model = api.model('CompleteSession', {
+    'tutorId': fields.String(required=True, description='The tutor UUID — must match the session owner'),
+})
+
+@api.route("/<string:sessionId>/complete")
+class CompleteSession(Resource):
+    @api.expect(complete_model)
+    def post(self, sessionId):
+        """Mark a booked session as completed. Validates tutor ownership and that end time has passed."""
+        data = request.get_json() or {}
+        tutor_id = data.get("tutorId")
+        if not tutor_id:
+            return {"message": "tutorId is required"}, 400
+
+        try:
+            resp = supabase.table('Session').select('*').eq('sessionId', sessionId).execute()
+            if not resp.data:
+                return {"message": "Session not found"}, 404
+            session = resp.data[0]
+        except Exception as e:
+            return {"message": "Failed to retrieve session", "error": str(e)}, 500
+
+        if session.get("tutorId") != tutor_id:
+            return {"message": "You are not authorised to complete this session"}, 403
+
+        if session.get("status") != "booked":
+            return {"message": f"Session cannot be completed — current status is '{session.get('status')}'"}, 409
+
+        end_time_str = session.get("endTime")
+        if not end_time_str:
+            return {"message": "Session has no end time"}, 500
+
+        try:
+            end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00"))
+            # Make timezone-aware if naive (Supabase may return without tz)
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=timezone.utc)
+        except Exception:
+            return {"message": "Invalid end time format"}, 500
+
+        if datetime.now(timezone.utc) < end_time:
+            return {"message": "Session cannot be marked complete before it has ended"}, 422
+
+        try:
+            update = supabase.table('Session').update({"status": "completed"}).eq('sessionId', sessionId).execute()
+            if update.data:
+                return update.data[0], 200
+            return {"message": "Failed to update session"}, 500
+        except Exception as e:
+            return {"message": "Failed to update session", "error": str(e)}, 500
+
+
+@api.route("/all")
 class SessionList(Resource):
 
     @api.doc(params={'tutorId': 'The ID of the tutor to filter by.', 'studentId': 'The ID of the student to filter by.'})

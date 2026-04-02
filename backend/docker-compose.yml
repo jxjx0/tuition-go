@@ -19,22 +19,42 @@ services:
       - calendar
       - email
       - payment
-      - book-session
+      - checkout
+      - process-booking
+      - create-session
+      - update-session
+      - delete-session
       - cancel-session
       - rate-tutor
       - get-sessions
     restart: unless-stopped
-
+  # ==================== RABBITMQ SERVICES ====================
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"     # AMQP (your services use this)
+      - "15672:15672"   # Web UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - tuition-network
+    restart: unless-stopped
   # ==================== ATOMIC SERVICES ====================
   student:
     build:
       context: ./atomic/student
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: student-service
     ports:
       - "5001:5001"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
 
     networks:
       - tuition-network
@@ -44,11 +64,15 @@ services:
     build:
       context: ./atomic/tutor
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: tutor-service
     ports:
       - "5002:5002"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
 
     networks:
       - tuition-network
@@ -58,11 +82,15 @@ services:
     build:
       context: ./atomic/session
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: session-service
     ports:
       - "5003:5003"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
     networks:
       - tuition-network
     restart: unless-stopped
@@ -85,9 +113,11 @@ services:
     container_name: calendar-service
     environment:
       - PYTHONUNBUFFERED=1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
     ports:
       - "5005:5005"
-      - "5080:5080" #for Google
     volumes:
       - ./atomic/calendar:/app
     networks:
@@ -109,6 +139,8 @@ services:
     build:
       context: ./atomic/payment
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: payment-service
     ports:
       - "5007:5007"
@@ -117,13 +149,78 @@ services:
     restart: unless-stopped
 
   # ==================== COMPOSITE SERVICES ====================
-  book-session:
+  checkout:
     build:
-      context: ./composite/book_session
+      context: ./composite/checkout
       dockerfile: Dockerfile
-    container_name: book-session-service
+    container_name: checkout-service
     ports:
       - "5100:5100"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - PAYMENT_SERVICE_URL=http://payment:5007
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  process-booking:
+    build:
+      context: ./composite/process_booking
+      dockerfile: Dockerfile
+    container_name: process-booking-service
+    ports:
+      - "5104:5104"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - STUDENT_SERVICE_URL=http://student:5001
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+      - PAYMENT_SERVICE_URL=http://payment:5007
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  create-session:
+    build:
+      context: ./composite/create_session
+      dockerfile: Dockerfile
+    container_name: create-session-service
+    ports:
+      - "5105:5105"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  update-session:
+    build:
+      context: ./composite/update_session
+      dockerfile: Dockerfile
+    container_name: update-session-service
+    ports:
+      - "5106:5106"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  delete-session:
+    build:
+      context: ./composite/delete_session
+      dockerfile: Dockerfile
+    container_name: delete-session-service
+    ports:
+      - "5107:5107"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - CALENDAR_SERVICE_URL=http://calendar:5005
     networks:
       - tuition-network
     restart: unless-stopped
@@ -135,6 +232,16 @@ services:
     container_name: cancel-session-service
     ports:
       - "5101:5101"
+    env_file:
+      - .env
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - STUDENT_SERVICE_URL=http://student:5001
+      - PAYMENT_SERVICE_URL=http://payment:5007
+      - CALENDAR_SERVICE_URL=http://calendar:5005
+      - EMAIL_SERVICE_URL=http://email:5006
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
     networks:
       - tuition-network
     restart: unless-stopped
@@ -159,6 +266,9 @@ services:
       - "5103:5103"
     environment:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - STUDENT_SERVICE_URL=http://student:5001
     networks:
       - tuition-network
     restart: unless-stopped
@@ -166,3 +276,7 @@ services:
 networks:
   tuition-network:
     driver: bridge
+
+volumes:
+  rabbitmq_data:
+    name: tuitiongo_rabbitmq_data

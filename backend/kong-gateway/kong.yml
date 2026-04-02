@@ -3,12 +3,11 @@ _transform: true
 
 consumers:
   - username: anonymous
-
   - username: clerk-user
     acls:
       - group: authenticated
     jwt_secrets:
-      - key: "https://right-crow-63.clerk.accounts.dev"   # replace with your Clerk issuer URL
+      - key: "https://right-crow-63.clerk.accounts.dev"
         algorithm: RS256
         rsa_public_key: |
           -----BEGIN PUBLIC KEY-----
@@ -24,123 +23,206 @@ consumers:
 plugins:
   - name: cors
     config:
-      origins:
-        - "http://localhost:5173"   # Vite dev server
-      methods:
-        - GET
-        - POST
-        - PUT
-        - PATCH
-        - DELETE
-        - OPTIONS
-      headers:
-        - Authorization
-        - Content-Type
-      exposed_headers:
-        - Authorization
+      origins: ["http://localhost:5173"]
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+      headers: ["Authorization", "Content-Type", "X-Google-Token", "X-User-Email"]
+      exposed_headers: ["Authorization"]
       credentials: true
-      preflight_continue: false   # Kong responds to OPTIONS itself, JWT plugin never runs
-
-  - name: jwt
-    config:
-      key_claim_name: iss
-      claims_to_verify:
-        - exp
-      anonymous: anonymous   # no token → anonymous consumer, passes through instead of 401
-
-  - name: acl
-    config:
-      allow:
-        - authenticated
-      hide_groups_header: true
+      preflight_continue: false
 
 services:
-  # Atomic Services
   - name: student-service
-    url: http://student:5001
+    url: http://student:5001/student
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: student-route
-        paths:
-          - /api/v1/students
+        paths: [/api/v1/students]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: tutor-service
-    url: http://tutor:5002
+    url: http://tutor:5002/tutor
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: tutor-route
-        paths:
-          - /api/v1/tutors
+        paths: [/api/v1/tutors]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: session-service
-    url: http://session:5003
+    url: http://session:5003/session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: session-route
-        paths:
-          - /api/v1/sessions
+        paths: [/api/v1/sessions]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: meeting-service
-    url: http://meeting:5004
+    url: http://meeting:5004/meeting
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: meeting-route
-        paths:
-          - /api/v1/meetings
+        paths: [/api/v1/meetings]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: calendar-service
-    url: http://calendar:5005
+    url: http://calendar:5005/calendar
     routes:
-      - name: calendar-route
-        paths:
-          - /api/v1/calendar
+      - name: calendar-public-route
+        paths: [/api/v1/calendar]
+        methods: [GET, OPTIONS]
         strip_path: true
+        # No security on GET (auth-status, auth-url, health)
+        
+      - name: calendar-protected-route
+        paths: [/api/v1/calendar]
+        methods: [POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+        plugins:
+          - name: jwt
+            config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+          - name: acl
+            config: {allow: [authenticated], hide_groups_header: true}
 
   - name: email-service
-    url: http://email:5006
+    url: http://email:5006/email
     routes:
       - name: email-route
-        paths:
-          - /api/v1/emails
+        paths: [/api/v1/emails]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: payment-service
-    url: http://payment:5007
+    url: http://payment:5007/payment
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: payment-route
-        paths:
-          - /api/v1/payments
+        paths: [/api/v1/payments]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
-  # Composite Services
-  - name: book-session-service
-    url: http://book-session:5100
+  - name: checkout-service
+    url: http://checkout:5100/checkout
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
-      - name: book-session-route
-        paths:
-          - /api/v1/book-session
+      - name: checkout-route
+        paths: [/api/v1/checkout]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
+  - name: process-booking-service
+    url: http://process-booking:5104/process-booking
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: process-booking-route
+        paths: [/api/v1/process-booking]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
+  - name: create-session-service
+    url: http://create-session:5105/create-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: create-session-route
+        paths: [/api/v1/create-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
+  - name: update-session-service
+    url: http://update-session:5106/update-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: update-session-route
+        paths: [/api/v1/update-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
+  - name: delete-session-service
+    url: http://delete-session:5107/delete-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: delete-session-route
+        paths: [/api/v1/delete-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: cancel-session-service
-    url: http://cancel-session:5101
+    url: http://cancel-session:5101/cancel-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: cancel-session-route
-        paths:
-          - /api/v1/cancel-session
+        paths: [/api/v1/cancel-session]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: rate-tutor-service
-    url: http://rate-tutor:5102
+    url: http://rate-tutor:5102/rate-tutor
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: rate-tutor-route
-        paths:
-          - /api/v1/rate-tutor
+        paths: [/api/v1/rate-tutor]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
   - name: get-sessions-service
-    url: http://get-sessions:5103
+    url: http://get-sessions:5103/getsessions
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
     routes:
       - name: get-sessions-route
-        paths:
-          - /api/v1/getsessions/
+        paths: [/api/v1/getsessions/]
+        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true

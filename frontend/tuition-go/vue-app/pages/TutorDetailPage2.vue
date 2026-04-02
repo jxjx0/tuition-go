@@ -1,23 +1,39 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { StarRating } from '../components'
 import { findTutorById } from "../composables/useTutors"
+import { useSessionService } from '../services/sessionService'
 
-function formatDate(d: string) { 
-  return new Date(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) 
+function toUtcDate(d: string) { return new Date(d + 'Z') }
+function formatDate(d: string) {
+  return toUtcDate(d).toLocaleDateString('en-SG', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+}
+function formatTime(d: string) {
+  return toUtcDate(d).toLocaleTimeString('en-SG', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
 const route = useRoute()
 const tutorId = computed(() => route.params.id as string)
 const { tutor, searchForTutor, loading } = findTutorById()
+const sessionService = useSessionService()
 
-const availableSessions = computed(() => [])
+const sessions = ref<any[]>([])
+const sessionsLoading = ref(true)
+const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
 const tutorReviews = computed(() => [])
 
-onMounted(() => {
+onMounted(async () => {
   searchForTutor(tutorId.value)
-});
+  try {
+    const { data } = await sessionService.getTutorSessions(tutorId.value)
+    sessions.value = data
+  } catch (err) {
+    console.error('Failed to fetch sessions', err)
+  } finally {
+    sessionsLoading.value = false
+  }
+})
 </script>
 
 <template>
@@ -85,8 +101,14 @@ onMounted(() => {
       </div>
       <div class="rounded-2xl border p-6 md:p-8 mb-8" style="background-color:#fff;border-color:#E8F0FE">
         <h2 class="text-lg font-bold mb-6" style="color:#1B3A5C">Available Sessions</h2>
-        <div v-if="availableSessions.length" class="space-y-3">
-          <div v-for="session in availableSessions" :key="session.id" class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border hover:shadow-sm" style="border-color:#E8F0FE">
+        <div v-if="sessionsLoading" class="text-center py-12">
+          <svg class="animate-spin w-8 h-8 mx-auto" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        </div>
+        <div v-else-if="availableSessions.length" class="space-y-3">
+          <div v-for="session in availableSessions" :key="session.sessionId" @click="$router.push('/session/' + session.sessionId)" class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl border hover:shadow-sm cursor-pointer" style="border-color:#E8F0FE">
             <div class="flex items-center gap-4">
               <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background-color:#E8F0FE">
                 <svg class="w-6 h-6" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -94,17 +116,16 @@ onMounted(() => {
                 </svg>
               </div>
               <div>
-                <p class="text-sm font-semibold" style="color:#1B3A5C">{{ session.subject }} ({{ session.level }})</p>
-                <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.6">{{ formatDate(session.date) }} · {{ session.startTime }} - {{ session.endTime }}</p>
+                <p class="text-sm font-semibold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</p>
+                <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.6">{{ formatDate(session.startTime) }} · {{ formatTime(session.startTime) }} - {{ formatTime(session.endTime) }}</p>
               </div>
             </div>
             <div class="flex items-center gap-4">
-              <p class="text-lg font-bold" style="color:#2EAA4F">${{ session.price.toFixed(2) }}</p>
-              <router-link :to="'/book/'+session.id" class="px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90" style="background-color:#2EAA4F">Book Now</router-link>
+              <p class="text-lg font-bold" style="color:#2EAA4F">${{ session.totalPrice?.toFixed(2) }}</p>
             </div>
           </div>
         </div>
-        <div v-else class="text-center py-12">
+        <div v-else-if="!availableSessions.length" class="text-center py-12">
           <div class="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3" style="background-color:#E8F0FE">
             <svg class="w-7 h-7" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -137,6 +158,13 @@ onMounted(() => {
           <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No reviews yet</p>
         </div>
       </div>
+    </div>
+    <div v-else-if="loading" class="text-center py-20">
+      <svg class="animate-spin w-10 h-10 mx-auto mb-4" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      <p class="text-lg font-semibold" style="color:#1B3A5C">Loading tutor details...</p>
     </div>
     <div v-else class="text-center py-20">
       <h2 class="text-2xl font-bold" style="color:#1B3A5C">Tutor not found</h2>
