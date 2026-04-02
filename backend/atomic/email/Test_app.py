@@ -1,6 +1,8 @@
 import requests
 import os
 import sys
+import pika
+import json
 
 # Add current directory to path so it can find app.py
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -9,7 +11,9 @@ from app import init_gmail_service, send_email
 # --- CONFIGURATION ---
 # Change this to your own email to see the result!
 TEST_RECIPIENT = "fabreyns@gmail.com" 
-API_URL = "http://127.0.0.1:5006/send-email"
+HEALTH_URL = "http://127.0.0.1:5006/health"
+RABBITMQ_HOST = "localhost" # Change to 'rabbitmq' if running inside docker
+QUEUE_NAME = "email_queue"
 
 def test_internal_functions():
     """Tests the Gmail logic directly without using the web server."""
@@ -35,47 +39,65 @@ def test_internal_functions():
         print(f" [FAIL] Function test failed: {e}")
         return False
 
-def test_rest_api():
-    """Tests the REST API endpoint. The Flask app MUST be running for this."""
-    print("\n--- [2] Testing REST API Endpoint (Integration) ---")
+def test_health_check():
+    """Tests the health check endpoint."""
+    print("\n--- [2] Testing Health Check Endpoint ---")
+    try:
+        response = requests.get(HEALTH_URL, timeout=10)
+        if response.status_code == 200:
+            print(f" [SUCCESS] Health Check: {response.json()}")
+        else:
+            print(f" [FAIL] Health check returned status {response.status_code}")
+    except Exception as e:
+        print(f" [FAIL] Could not connect to health check: {e}")
+
+def test_rabbitmq_publisher():
+    """Tests the RabbitMQ consumer by publishing a message to the queue."""
+    print("\n--- [3] Testing RabbitMQ Publisher (Async Integration) ---")
     
     payload = {
         "email": TEST_RECIPIENT,
         "type": "BOOKING_SUCCESS",
         "reply_to": "tutor_contact@example.com",
         "details": {
-            "student_name": "Test Student",
-            "tutor_name": "Prof. Matrix",
-            "subject": "Advanced Microservices",
-            "date": "2024-12-25",
-            "time": "10:00 AM",
-            "meeting_link": "https://meet.google.com/test-link"
+            "student_name": "Test Student (RabbitMQ)",
+            "tutor_name": "Prof. Rabbit",
+            "subject": "Messaging Queues 101",
+            "date": "2024-12-26",
+            "time": "11:00 AM",
+            "meeting_link": "https://meet.google.com/rabbitmq-link"
         }
     }
 
     try:
-        print(f" [INFO] Sending POST request to {API_URL}...")
-        response = requests.post(API_URL, json=payload, timeout=10)
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+        channel = connection.channel()
+        channel.queue_declare(queue=QUEUE_NAME, durable=True)
         
-        if response.status_code == 200:
-            print(f" [SUCCESS] API Response: {response.json()}")
-        else:
-            print(f" [FAIL] API returned status {response.status_code}: {response.text}")
-            print(" [HINT] Is the Flask app running? Run 'python app.py' in another terminal.")
-            
-    except requests.exceptions.ConnectionError:
-        print(" [FAIL] Could not connect to the server.")
-        print("        ERROR: The server at http://127.0.0.1:5006 is not responding.")
-        print("        ACTION: Open a new terminal and run 'python app.py' first.")
+        print(f" [INFO] Publishing message to {QUEUE_NAME}...")
+        channel.basic_publish(
+            exchange='',
+            routing_key=QUEUE_NAME,
+            body=json.dumps(payload),
+            properties=pika.BasicProperties(
+                delivery_mode=2,  # make message persistent
+            )
+        )
+        print(" [SUCCESS] Message published. Check the email service logs for delivery confirmation.")
+        connection.close()
     except Exception as e:
-        print(f" [ERROR] Unexpected error: {e}")
+        print(f" [FAIL] RabbitMQ Publisher failed: {e}")
+        print(" [HINT] Is RabbitMQ running? Check your docker containers.")
 
 if __name__ == "__main__":
-    print("TuitionGo Email Service Test Suite")
-    print("==================================")
+    print("TuitionGo Email Service Test Suite (Worker Version)")
+    print("==================================================")
     
     # 1. Test the internal logic first (does not need the server)
     test_internal_functions()
     
-    # 2. Test the API (NEEDS the server to be running in another terminal)
-    test_rest_api()
+    # 2. Test the Health Check
+    test_health_check()
+
+    # 3. Test RabbitMQ
+    test_rabbitmq_publisher()

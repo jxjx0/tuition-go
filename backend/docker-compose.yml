@@ -101,6 +101,20 @@ services:
     container_name: email-service
     ports:
       - "5006:5006"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    networks:
+      - tuition-network
+    depends_on:
+      - rabbitmq
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
     networks:
       - tuition-network
     restart: unless-stopped
