@@ -58,6 +58,7 @@ async function bookSession() {
       session_id: session.value.id,
       student_id: currentStudentId.value,
     })
+    //data.url is the Stripe Checkout URL returned by the backend
     window.location.href = data.url
   } catch (err) {
     console.error('Failed to initiate booking', err)
