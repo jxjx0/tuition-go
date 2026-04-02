@@ -108,8 +108,16 @@ def process_email_message(ch, method, properties, body):
                 "Good luck with your session!"
             )
         elif email_type == "CANCELLATION":
-            subject = "Session Cancelled - TuitionGo"
-            content = f"Your session on {details.get('date')} for {details.get('subject')} has been cancelled."
+            subject = "Canceled: Tuition Session - TuitionGo"
+            content = (
+                "This event has been canceled.\n\n"
+                "Tuition session cancelled via TuitionGo.\n\n"
+                "When\n"
+                f"{details.get('date')}\n\n"
+                "Organizer\n"
+                f"{details.get('tutor_name')}\n"
+                f"{details.get('tutor_email')}"
+            )
         else:
             subject = "Notification - TuitionGo"
             content = "You have a new update regarding your session."
@@ -126,9 +134,11 @@ def start_rabbitmq_consumer():
     try:
         connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
         channel = connection.channel()
+        channel.exchange_declare(exchange="tuitiongo.email", exchange_type="direct", durable=True)
         channel.queue_declare(queue=QUEUE_NAME, durable=True)
+        channel.queue_bind(queue=QUEUE_NAME, exchange="tuitiongo.email", routing_key="notification.email")
         channel.basic_consume(queue=QUEUE_NAME, on_message_callback=process_email_message)
-        
+
         print(f" [*] Waiting for messages in {QUEUE_NAME}. To exit press CTRL+C")
         channel.start_consuming()
     except Exception as e:
