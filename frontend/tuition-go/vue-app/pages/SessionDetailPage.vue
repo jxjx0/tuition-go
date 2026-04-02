@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useUser } from '@clerk/vue'
 import { useSessionService } from '../services/sessionService'
 import { useApi } from '../services/api'
+import { avatarUrl } from '../utils/avatar'
 
 interface Session {
   id: string
@@ -120,7 +121,7 @@ async function fetchSession() {
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
       tutorName: data.tutorName,
-      tutorAvatar: data.tutorImageUrl || 'https://via.placeholder.com/56?text=Tutor',
+      tutorAvatar: avatarUrl(data.tutorImageUrl, data.tutorId),
       subject: data.subjectName,
       level: data.academicLevel,
       date: data.startTime,

@@ -114,12 +114,17 @@ async function fetchSessions(id: string) {
   }
 }
 
-watch(tutorId, (id) => {
-  if (id) {
-    searchForTutor(id)
-    fetchSessions(id)
+const api = useApi()
+const tutorReviews = ref<any[]>([])
+
+async function fetchReviews(id: string) {
+  try {
+    const { data } = await api.get(`/get-tutor/${id}`)
+    tutorReviews.value = data?.reviews ?? []
+  } catch {
+    tutorReviews.value = []
   }
-}, { immediate: true })
+}
 
 function isBookedSession(session: any) {
   const st = (session.status || '').toLowerCase()
@@ -152,20 +157,12 @@ const displayedSessions = computed(() => {
   return bookedSessions.value
 })
 
-const api = useApi()
-const tutorReviews = ref<any[]>([])
-
-async function fetchReviews(id: string) {
-  try {
-    const { data } = await api.get(`/get-tutor/${id}`)
-    tutorReviews.value = data?.reviews ?? []
-  } catch {
-    tutorReviews.value = []
-  }
-}
-
 watch(tutorId, (id) => {
-  if (id) fetchReviews(id)
+  if (id) {
+    searchForTutor(id)
+    fetchSessions(id)
+    fetchReviews(id)
+  }
 }, { immediate: true })
 
 const tutorStats = computed(() => [
@@ -304,11 +301,11 @@ const tutorStats = computed(() => [
         <div>
           <h2 class="text-lg font-bold mb-4" style="color:#1B3A5C">Recent Reviews</h2>
           <div class="space-y-3">
-            <div v-for="review in tutorReviews" :key="review.id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
+            <div v-for="review in tutorReviews" :key="review.review_id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
               <div class="flex items-center gap-2 mb-2">
                 <img :src="avatarUrl(review.studentAvatar, review.student_id)" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold truncate" style="color:#1B3A5C">{{ review.studentName }}</p>
+                  <p class="text-xs font-semibold" style="color:#1B3A5C">{{ review.studentName || 'Anonymous' }}</p>
                   <StarRating :modelValue="review.rating" size="sm"/>
                 </div>
               </div>
