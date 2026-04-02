@@ -44,7 +44,7 @@ class GetTutor(Resource):
 
         # 2. Fetch reviews from OutSystems
         reviews_resp = requests.get(
-            f"{REVIEW_SERVICE_URL}/review/{tutor_id}",
+            f"{REVIEW_SERVICE_URL}/tut_review/{tutor_id}",
             timeout=10
         )
         raw_reviews = []
