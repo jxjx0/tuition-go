@@ -81,8 +81,14 @@ const fetchSessions = async () => {
   }
 }
 
-const upcomingSessions = computed(() => sessions.value.filter(s => s.status === 'booked'))
-const completedSessions = computed(() => sessions.value.filter(s => s.status === 'completed'))
+const upcomingSessions = computed(() =>
+  sessions.value.filter(s => s.status === 'booked')
+    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+)
+const completedSessions = computed(() =>
+  sessions.value.filter(s => s.status === 'completed')
+    .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+)
 
 const tabs = computed(() => [
   { key: 'upcoming',  label: 'Upcoming',   count: upcomingSessions.value.length },
