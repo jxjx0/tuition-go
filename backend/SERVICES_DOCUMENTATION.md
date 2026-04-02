@@ -1,574 +1,809 @@
-# Tuition-Go Backend Services Documentation
+# TuitionGo — Services Documentation
 
-**Last Updated**: April 1, 2026  
-**API Version**: 1.0
-
----
-
-## Quick Start
-- **Gateway URL**: `http://localhost:8000`
-- **All requests** go through Kong Gateway → routed to appropriate service
-- **Auth**: JWT Bearer token (handled by Kong middleware)
-
-## Table of Contents
-1. [API Gateway & Authentication](#api-gateway--authentication)
-2. [Service Overview](#service-overview)
-3. [Atomic Services](#atomic-services)
-4. [Composite Services](#composite-services)
-5. [Common Workflows](#common-workflows)
+**Last Updated**: April 2, 2026
+**Stack**: Flask microservices · Kong API Gateway · Clerk (JWT) · Supabase (PostgreSQL) · Google Calendar · Stripe · OutSystems (external reviews)
 
 ---
 
-## API Gateway & Authentication
-
-### Kong Gateway
-Single entry point routing all requests to microservices.
-- **URL**: `http://localhost:8000`
-- **Config**: `backend/kong-gateway/kong.yml`
-
-### JWT Authentication (Kong Middleware)
-
-Kong validates all authenticated requests using JWT:
+## How It Works (Big Picture)
 
 ```
-Client Request → Kong Gateway
-                 ↓
-          Validate JWT Token
-          (signature, expiry, claims)
-                 ↓
-        ✓ Valid → Route to service
-        ✗ Invalid → 401 Unauthorized
+Browser (Vue 3)
+      │
+      │  All requests to http://localhost:8000
+      ▼
+Kong API Gateway  ──── validates JWT (Clerk RS256) on protected routes
+      │
+      ├─── Atomic Services (own their data)
+      │       Student (5001) · Tutor (5002) · Session (5003)
+      │       Payment (5007) · Calendar (5005)
+      │
+      └─── Composite Services (orchestrate atomics)
+              Checkout (5100) · Process Booking (5104)
+              Create/Update/Delete Session (5105/5106/5107)
+              Cancel Session (5101) · Get Sessions (5103)
+              Rate Tutor (5102) · Get Tutor (5109)
 ```
 
-**Token Format**:
+**Rule**: Composite services call atomic services. Atomic services never call each other.
+
+---
+
+## Gateway Route Map
+
+All frontend requests use the prefix `/api/v1/...`
+
+| Frontend Path Prefix | Routes To | Port | Auth |
+|---|---|---|---|
+| `/api/v1/students` | Student | 5001 | ✅ JWT |
+| `/api/v1/tutors` | Tutor | 5002 | ✅ JWT |
+| `/api/v1/sessions` | Session | 5003 | ✅ JWT |
+| `/api/v1/meetings` | Meeting | 5004 | ✅ JWT |
+| `/api/v1/calendar` | Calendar | 5005 | GET public, others ✅ JWT |
+| `/api/v1/emails` | Email | 5006 | No auth |
+| `/api/v1/payments` | Payment | 5007 | ✅ JWT |
+| `/api/v1/checkout` | Checkout | 5100 | ✅ JWT |
+| `/api/v1/process-booking` | Process Booking | 5104 | ✅ JWT |
+| `/api/v1/create-session` | Create Session | 5105 | ✅ JWT |
+| `/api/v1/update-session` | Update Session | 5106 | ✅ JWT |
+| `/api/v1/delete-session` | Delete Session | 5107 | ✅ JWT |
+| `/api/v1/cancel-session` | Cancel Session | 5101 | ✅ JWT |
+| `/api/v1/rate-tutor` | Rate Tutor | 5102 | ✅ JWT |
+| `/api/v1/getsessions` | Get Sessions | 5103 | ✅ JWT |
+| `/api/v1/get-tutor` | Get Tutor | 5109 | ✅ JWT |
+| `/api/v1/reviews` | OutSystems (external) | — | ✅ JWT |
+
+---
+
+---
+
+# SECTION 1 — BOOKING FLOW
+
+This covers everything from browsing tutors to completing a paid booking. Also includes tutor-side session management (create, edit, delete, complete).
+
+---
+
+## 1.1 Browse Tutors
+
+**Page**: `BrowseTutorsPage2.vue`
+
 ```
-Authorization: Bearer <JWT_TOKEN>
+Frontend  →  GET /api/v1/tutors/search?name=&subject=&level=&minRating=
+          ←  [{ tutorId, name, imageURL, bio, averageRating, totalReviews, subjects[] }]
 ```
 
-**Token Validation**:
-- Kong verifies JWT signature using `JWT_SECRET_KEY`
-- Checks token expiry
-- Forwards auth header to downstream services
-- Services can access token claims for user context
+**Atomic**: Tutor Service (5002)
+`GET /tutor/search` — filters by name, subject, academic level, min rating
 
-**Example Request**:
-```bash
-curl -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
-     http://localhost:8000/session/session-123
+---
+
+## 1.2 View Tutor Detail
+
+**Page**: `TutorDetailPage2.vue`
+
+Two parallel calls on mount:
+
+```
+Frontend  →  GET /api/v1/get-tutor/<tutorId>          (composite)
+          ←  { tutorId, name, imageURL, bio, averageRating, totalReviews,
+                subjects[], reviews[{ ..., studentName, studentAvatar }] }
+
+Frontend  →  GET /api/v1/sessions/all?tutorId=<id>    (atomic, for available slots)
+          ←  [{ sessionId, startTime, endTime, status, tutorSubjectId, ... }]
 ```
 
-### Route Mapping
-
-| Path | Service | Port | Auth |
-|------|---------|------|------|
-| `/student/*` | Student | 5001 | Per-endpoint |
-| `/tutor/*` | Tutor | 5002 | Per-endpoint |
-| `/session/*` | Session | 5003 | Per-endpoint |
-| `/meeting/*` | Meeting | 5004 | No |
-| `/calendar/*` | Calendar | 5005 | Yes |
-| `/email/*` | Email | 5006 | No |
-| `/payment/*` | Payment | 5007 | Per-endpoint |
-| `/checkout/*` | Checkout | 5100 | Yes |
-| `/rate-tutor/*` | Rate Tutor | 5102 | No |
-| `/getsessions/*` | Get Sessions | 5103 | No |
-| `/process-booking/*` | Process Booking | 5104 | **Yes (Required)** |
-| `/cancel-session/*` | Cancel Session | 5101 | No |
+The get-tutor composite (5109) internally calls:
+1. `GET /tutor/<id>` → tutor profile
+2. `GET /review/<tutorId>` → OutSystems reviews
+3. `GET /student/<studentId>` for each reviewer → adds `studentName`, `studentAvatar`
 
 ---
 
-## Service Overview
+## 1.3 Book a Session (Student)
+
+**Page**: `SessionDetailPage.vue` → `PaymentSuccess.vue`
+
+### Step 1 — Load session details
+
+```
+Frontend  →  GET /api/v1/getsessions/session/<sessionId>    (composite)
+          ←  { sessionId, tutorId, tutorName, tutorImageUrl,
+                subjectName, academicLevel, totalPrice,
+                startTime, endTime, status, meetingLink, ... }
+```
+
+Get Sessions composite (5103) calls:
+- `GET /session/<id>` → session record
+- `GET /tutor/<tutorId>` → tutor name, image
+- `GET /tutor/<tutorId>/subjects` → subject name, hourly rate → calculates `totalPrice`
+- `GET /student/<studentId>` → student name, image (if booked)
+
+### Step 2 — Initiate checkout
+
+```
+Frontend  →  POST /api/v1/checkout/checkout
+             Body: { session_id, student_id }
+          ←  { checkout_url: "https://checkout.stripe.com/..." }
+
+Frontend  →  window.location.href = checkout_url    (redirect to Stripe)
+```
+
+Checkout composite (5100) calls:
+1. `GET /session/<id>` → session record
+2. `GET /tutor/<tutorId>` → tutor name
+3. `GET /tutor/<tutorId>/subjects` → hourly rate → calculates price in cents
+4. `POST /payment/create-checkout-session` → creates Stripe session, returns URL
+
+### Step 3 — Process booking after payment
+
+Stripe redirects back to `/payment-success?session_id=<stripe_id>`
+
+```
+Frontend  →  POST /api/v1/process-booking/process-booking
+             Body: { stripe_session_id: "cs_live_..." }
+          ←  { message, sessionId, status: "booked", meeting_link,
+                student_name, tutor_name, amount_paid }
+```
+
+Process Booking composite (5104) calls:
+1. `POST /payment/verify` → confirms payment is `paid`, extracts session/student/tutor IDs
+2. `PUT /session/<id>` → sets `status = "booked"`, links `studentId`
+3. `GET /student/<studentId>` → student email (for calendar invite)
+4. `GET /tutor/<tutorId>` → tutor clerkUserId (for calendar)
+5. `POST /calendar/update-meeting` → adds student as attendee to the Google Calendar event
+
+**Session status after this step**: `booked`
 
 ---
 
-## Atomic Services
+## 1.4 Student Dashboard — View Sessions
 
-Core services that handle specific business domains. Each has its own database.
+**Page**: `StudentDashboardPage.vue`
 
-### 1. Student Service (Port 5001)
-Manages student profiles and accounts.
+```
+Frontend  →  GET /api/v1/getsessions/student/<studentId>/sessions
+          ←  [{ sessionId, tutorName, tutorImageUrl, subjectName,
+                 academicLevel, totalPrice, startTime, endTime,
+                 status, meetingLink, durationMins }]
+```
 
-**Key Endpoints**:
-- `POST /student/register` - Create student account
-- `GET /student/<id>` - Get profile
-- `PUT /student/<id>` - Update profile (with file upload)
-- `GET /student/by-clerk/<clerkId>` - Get by Clerk user ID
-- `DELETE /student/<id>` - Delete account
-
-**Auth**: Public for register, required for others
+Sessions are filtered client-side into tabs: Upcoming · Completed · Cancelled
 
 ---
 
-### 2. Tutor Service (Port 5002)
-Manages tutor profiles, subjects, and ratings.
+## 1.5 Student Session Detail
 
-**Key Endpoints**:
-- `POST /tutor/register` - Create tutor (Gmail required)
-- `GET /tutor/all` - List all tutors
-- `GET /tutor/search` - Search by subject, level, name, rating
-- `GET /tutor/<id>` - Get profile with subjects
-- `PUT /tutor/<id>` - Update profile & bio
-- `PUT /tutor/<id>/updateRating` - Update tutor rating
-- `POST /tutor/<id>/subjects` - Add subject offering
-- `GET /tutor/<id>/subjects` - List tutor's subjects
-- `PUT/DELETE /tutor/<id>/subjects/<subjectId>` - Manage subjects
+**Page**: `SessionDetailPage.vue`
 
-**Auth**: Public for GET, required for modifying data
+```
+Frontend  →  GET /api/v1/getsessions/session/<sessionId>
+          ←  { full enriched session with tutor + student info }
+```
 
 ---
 
-### 3. Session Service (Port 5003)
-Manages tutoring session records (calendar, scheduling).
+## 1.6 Tutor Dashboard — View Sessions
 
-**Key Endpoints**:
-- `POST /session/session` - Create session (checks overlaps)
-- `GET /session/<id>` - Get session details
-- `GET /session/all` - Get sessions (filter by tutorId/studentId)
-- `PUT /session/<id>` - Update session
-- `DELETE /session/<id>` - Cancel session
+**Page**: `TutorDashboardPage.vue`
 
-**Auth**: Required for create/update/delete
+```
+Frontend  →  GET /api/v1/getsessions/tutor/<tutorId>/sessions
+          ←  [{ sessionId, studentName, studentImageUrl, subjectName,
+                 totalPrice, startTime, endTime, status, meetingLink, ... }]
+```
 
----
-
-### 4. Payment Service (Port 5007)
-Handles Stripe payment processing.
-
-**Key Endpoints**:
-- `GET /payment/config` - Get Stripe publishable key (public)
-- `POST /payment/create-checkout-session` - Create Stripe checkout
-- `POST /payment/verify` - Verify payment completion
-
-**Auth**: Required for checkout & verify
-
-**External**: Stripe API
+Sessions filtered client-side into 4 tabs: Booked · Available · Completed · Cancelled
 
 ---
 
-### 5. Calendar Service (Port 5005)
-Creates Google Calendar events with Meet links.
+## 1.7 Tutor Creates a Session Slot
 
-**Key Endpoints**:
-- `POST /calendar/create-meeting` - Create calendar event + Meet link
-- `POST /calendar/update-meeting` - Add attendee to event
+**Page**: `TutorDashboardPage.vue` (Create Session Slot form)
 
-**Auth**: Required
+```
+Frontend  →  POST /api/v1/create-session/create-session
+             Body: { tutorId, tutorSubjectId, startTime, endTime,
+                     durationMins, summary, timezone }
+          ←  { sessionId, status: "available", calendarEventId, meetingLink, ... }
+```
 
-**External**: Google Calendar API
+Create Session composite (5105) calls:
+1. `POST /session/session` → creates session record with `status = "available"`
+2. `POST /calendar/create-meeting` → creates Google Calendar event, generates Meet link
+3. `PUT /session/<id>` → patches session with `calendarEventId` + `meetingLink`
 
----
-
-### 6. Email Service (Port 5006)
-Notification system (scaffolded - not yet implemented).
-
-**Status**: ⚠️ Placeholder only
-
----
-
-### 7. Meeting Service (Port 5004)
-Meeting management (scaffolded - not yet implemented).
-
-**Status**: ⚠️ Placeholder only
+**On 409**: Tutor already has an overlapping session at that time
 
 ---
 
-## Composite Services
+## 1.8 Tutor Edits a Session
 
-Orchestrate atomic services for complex workflows.
+**Page**: `TutorSessionEditPage.vue`
 
-### 1. Checkout Service (Port 5100)
-Initiates payment for a session.
+```
+Frontend  →  PUT /api/v1/update-session/<sessionId>
+             Body: { tutorSubjectId, startTime, endTime, durationMins,
+                     summary, timezone }
+          ←  { updated session object }
+```
 
-**Endpoint**:
-- `POST /checkout/checkout` - Orchestrate checkout
+Update Session composite (5106) calls:
+1. `GET /session/<id>` → checks session exists and is not `booked` (blocked if booked)
+2. `PUT /session/<id>` → updates times, subject
+3. `GET /tutor/<tutorId>` → gets `clerkUserId` for calendar API
+4. `POST /calendar/reschedule-meeting` → updates Google Calendar event times
+
+---
+
+## 1.9 Tutor Deletes a Session
+
+**Page**: `TutorSessionEditPage.vue`
+
+```
+Frontend  →  DELETE /api/v1/delete-session/<sessionId>
+          ←  { message: "Session and calendar event deleted successfully" }
+```
+
+Delete Session composite (5107) calls:
+1. `GET /session/<id>` → checks session exists and is not `booked` (blocked if booked)
+2. `DELETE /session/<id>` → hard-deletes the session record
+3. `GET /tutor/<tutorId>` → gets `clerkUserId` for calendar API
+4. `POST /calendar/delete-meeting` → removes the Google Calendar event
+
+---
+
+## 1.10 Tutor Marks Session as Complete
+
+**Page**: `TutorSessionEditPage.vue` — "Mark as Complete" button (only shows after `endTime`)
+
+```
+Frontend  →  POST /api/v1/sessions/<sessionId>/complete
+             Body: { tutorId }
+          ←  { sessionId, status: "completed", ... }
+```
+
+**Atomic only** — Session Service (5003) directly:
+- Verifies `tutorId` matches the session's tutor
+- Verifies `status === "booked"`
+- Verifies `now > endTime` (session has actually ended)
+- Updates `status = "completed"`
+
+**Session status after this step**: `completed`
+
+---
+
+## Session Status Lifecycle
+
+```
+[available]  ──── student pays ────►  [booked]
+                                           │
+                                     session ends + tutor clicks complete
+                                           │
+                                           ▼
+                                      [completed]  ──── student can now review ───►  Review Flow
+
+[available/booked]  ─── cancel ───►  [cancelled]
+```
+
+---
+
+---
+
+# SECTION 2 — REVIEW FLOW
+
+This covers what happens after a session is completed. A student can leave a review, and reviews are publicly visible on the tutor detail page.
+
+---
+
+## 2.1 Student Leaves a Review
+
+**Page**: `ReviewPage.vue`
+Navigated to from the student dashboard when session status is `completed`
+
+### Step 1 — Load session + duplicate check
+
+On mount, two calls run:
+
+```
+Frontend  →  GET /api/v1/getsessions/session/<sessionId>
+          ←  { status, tutorId, tutorName, tutorImageUrl,
+                subjectName, academicLevel, startTime, endTime }
+
+             (if status !== "completed" → show error, no form)
+
+Frontend  →  GET /api/v1/get-tutor/<tutorId>
+          ←  { reviews: [{ session_id, student_id, rating, comment, ... }] }
+
+             (if any review.session_id === sessionId → show "Already Reviewed" screen)
+```
+
+### Step 2 — Submit review
+
+```
+Frontend  →  POST /api/v1/rate-tutor/review
+             Body: { session_id, tutor_id, rating (1-5), comment }
+          ←  { message, review, tutorRating }
+```
+
+Rate Tutor composite (5102) calls:
+1. `GET /session/<sessionId>` → verifies `status === "completed"`, confirms `tutorId` matches
+2. `GET /review/<tutorId>` on OutSystems → checks no existing review for this `session_id` (409 if duplicate)
+3. `POST /review` on OutSystems → saves the review (with `student_id`, `session_id`, `tutor_id`, `rating`, `comment`, `createdAt`)
+4. `PUT /tutor/updateRating` → recalculates and stores the tutor's new `averageRating` and `totalReviews`
+
+**On 409**: "You have already reviewed this session" (enforced both frontend and backend)
+
+---
+
+## 2.2 Tutor Detail Page — Show Reviews
+
+**Page**: `TutorDetailPage2.vue`
+
+Reviews are loaded as part of the single `GET /api/v1/get-tutor/<tutorId>` call (same as 1.2 above):
+
+```
+Frontend  →  GET /api/v1/get-tutor/<tutorId>
+          ←  {
+               tutorId, name, imageURL, bio, averageRating, totalReviews,
+               subjects: [...],
+               reviews: [
+                 {
+                   review_id, session_id, tutor_id, student_id,
+                   rating, comment, createdAt,
+                   studentName,    ← enriched by get-tutor composite
+                   studentAvatar   ← enriched by get-tutor composite
+                 }
+               ]
+             }
+```
+
+Get Tutor composite (5109) calls:
+1. `GET /tutor/<id>` → tutor profile
+2. `GET /review/<tutorId>` on OutSystems → raw reviews list
+3. For each review: `GET /student/<student_id>` → adds `studentName`, `studentAvatar`
+
+---
+
+## 2.3 Tutor Dashboard — Recent Reviews Sidebar
+
+**Page**: `TutorDashboardPage.vue`
+
+Uses the same `GET /api/v1/get-tutor/<tutorId>` call as above. Reviews come back already enriched with student names and avatars.
+
+```
+Frontend  →  GET /api/v1/get-tutor/<tutorId>
+          ←  { ..., reviews: [{ rating, comment, createdAt, studentName, studentAvatar }] }
+```
+
+---
+
+## Review Data (OutSystems Schema)
+
+OutSystems stores and returns review records in this shape:
+
+```json
+{
+  "review_id": 1712345678000,
+  "session_id": "9aeb38e9-...",
+  "tutor_id":   "0e5767bb-...",
+  "student_id": "d1234abc-...",
+  "rating": 5,
+  "comment": "Excellent session!",
+  "createdAt": "2026-04-02T10:30:00.000000Z"
+}
+```
+
+**External endpoints used**:
+- `GET  /review/<tutorId>` → `{ data: { reviews: [...] } }`
+- `POST /review` → create review
+
+---
+
+---
+
+# Atomic Services Reference
+
+These are the base services that own and persist data.
+
+---
+
+### Student Service — Port 5001
+
+Manages student profiles stored in Supabase.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/student/register` | Create student profile |
+| `GET`  | `/student/<id>` | Get student by UUID |
+| `PUT`  | `/student/<id>` | Update profile (supports image upload) |
+| `GET`  | `/student/by-clerk/<clerkId>` | Look up by Clerk user ID |
+| `DELETE` | `/student/<id>` | Delete account |
+
+---
+
+### Tutor Service — Port 5002
+
+Manages tutor profiles and subject offerings.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/tutor/register` | Create tutor profile |
+| `GET`  | `/tutor/all` | List all tutors |
+| `GET`  | `/tutor/search` | Filter by name, subject, level, rating |
+| `GET`  | `/tutor/<id>` | Get tutor profile with subjects |
+| `PUT`  | `/tutor/<id>` | Update bio, image |
+| `POST` | `/tutor/<id>/subjects` | Add a subject offering |
+| `GET`  | `/tutor/<id>/subjects` | List tutor's subjects |
+| `PUT`  | `/tutor/<id>/subjects/<subjectId>` | Update subject |
+| `DELETE` | `/tutor/<id>/subjects/<subjectId>` | Remove subject |
+| `PUT`  | `/tutor/updateRating` | Recalculate average rating (called by rate-tutor composite) |
+
+---
+
+### Session Service — Port 5003
+
+Manages session records. Status transitions: `available → booked → completed / cancelled`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/session/session` | Create session (checks overlaps) |
+| `GET`  | `/session/<id>` | Get single session |
+| `GET`  | `/session/all` | List sessions (filter: `?tutorId=` or `?studentId=`) |
+| `PUT`  | `/session/<id>` | Update any field(s) |
+| `DELETE` | `/session/<id>` | Hard-delete session |
+| `POST` | `/session/<id>/complete` | Mark session complete (backend-validated) |
+
+**Complete endpoint rules**: caller must be the session's tutor, status must be `booked`, current time must be after `endTime`.
+
+---
+
+### Payment Service — Port 5007
+
+Wraps the Stripe API.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/payment/config` | Get Stripe publishable key |
+| `POST` | `/payment/create-checkout-session` | Create Stripe checkout URL |
+| `POST` | `/payment/verify` | Verify completed payment, extract metadata |
+
+---
+
+### Calendar Service — Port 5005
+
+Manages Google Calendar events with Meet links. Uses OAuth tokens per Clerk user.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/calendar/create-meeting` | Create event + Meet link |
+| `POST` | `/calendar/update-meeting` | Add attendee to event |
+| `POST` | `/calendar/reschedule-meeting` | Update event times |
+| `POST` | `/calendar/delete-meeting` | Delete calendar event |
+
+---
+
+### Email Service — Port 5006 _(not yet implemented)_
+
+Placeholder — no active endpoints.
+
+---
+
+---
+
+# Composite Services Reference
+
+---
+
+### Checkout — Port 5100
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/checkout/checkout` | Validate session + calculate price + create Stripe checkout URL |
 
 **Input**:
 ```json
 {
-  "session_id": "session-uuid-789",
-  "student_id": "student-uuid-456"
+  "session_id": "uuid",
+  "student_id": "uuid"
 }
 ```
 
-**Exact Orchestration** (in sequence):
-
-1. **Fetch Session Details**
-   ```
-   GET http://session:5003/session/session-uuid-789
-   Headers: Authorization (forwarded)
-   Response: { sessionId, tutorId, tutorSubjectId, startTime, endTime, durationMins, ... }
-   ```
-
-2. **Fetch Tutor Details**
-   ```
-   GET http://tutor:5002/tutor/{tutorId from session}
-   Response: { tutorId, name, averageRating, totalReviews, ... }
-   ```
-
-3. **Fetch Tutor Subjects (for pricing)**
-   ```
-   GET http://tutor:5002/tutor/{tutorId}/subjects
-   Response: [{ subjectId, tutorId, subject, academicLevel, hourlyRate }, ...]
-   ```
-
-4. **Find matching subject & calculate price**
-   ```
-   Match: tutorSubjectId from session with subjects array
-   Calculate: hourlyRate × (durationMins / 60) = totalPrice
-   ```
-
-5. **Create Stripe Checkout Session**
-   ```
-   POST http://payment:5007/payment/create-checkout-session
-   Headers: Authorization (forwarded)
-   Body: {
-     title: "{subject} Tutoring Session",
-     description: "1 hour {subject} {academicLevel} with {tutorName}",
-     amount: totalPrice (in cents),
-     tutor_name: tutorName,
-     subject: subjectName,
-     lesson_date: startTime,
-     session_id: sessionId,
-     student_id: studentId,
-     tutor_id: tutorId
-   }
-   Response: { checkout_url, session_id }
-   ```
-
-**Output**:
+**Output** `200`:
 ```json
 {
-  "checkout_url": "https://checkout.stripe.com/pay/cs_live_...",
-  "session_id": "cs_live_...",
-  "session_details": { ... },
-  "tutor_details": { name, hourlyRate, ... }
+  "url": "https://checkout.stripe.com/pay/cs_live_...",
+  "id":  "cs_live_..."
 }
 ```
 
-**Auth**: Required
+**Errors**: `400` missing fields · `404` session or subject not found · `500` downstream failure
 
-**Calls**: Session (5003) → Tutor (5002) → Payment (5007)
-
----
-
-### 2. Get Sessions Service (Port 5103)
-Retrieves sessions with enriched data (tutor/student details, pricing).
-
-**Endpoints**:
-- `GET /getsessions/student/<studentId>/sessions` - Student's sessions
-- `GET /getsessions/tutor/<tutorId>/sessions` - Tutor's sessions
-- `GET /getsessions/session/<sessionId>` - Single session
-
-**Orchestration A: Get Student Sessions**
-
-**Input**: `studentId` (path parameter)
-
-**Exact Flow**:
-
-1. **Fetch all sessions for student**
-   ```
-   GET http://session:5003/session/all?studentId=student-uuid-456
-   Response: [
-     { sessionId, tutorId, tutorSubjectId, studentId, startTime, endTime, durationMins, ... },
-     ...
-   ]
-   ```
-
-2. **For each session, enrich with tutor data**:
-   ```
-   GET http://tutor:5002/tutor/{tutorId}
-   Response: { tutorId, name, imageURL, ... }
-   ```
-
-3. **For each session, get tutor subject/price**:
-   ```
-   GET http://tutor:5002/tutor/{tutorId}/subjects
-   Find: matching tutorSubjectId
-   Extract: subject, academicLevel, hourlyRate
-   Calculate: totalPrice = hourlyRate × (durationMins / 60)
-   ```
-
-**Output** (array):
-```json
-[
-  {
-    "sessionId": "...",
-    "tutorId": "...",
-    "studentId": "...",
-    "tutorName": "Dr. Alice Smith",
-    "tutorImageUrl": "https://...",
-    "subjectName": "Mathematics",
-    "academicLevel": "GCSE",
-    "totalPrice": 35.00,
-    "startTime": "2025-04-15T14:00:00Z",
-    ...
-  }
-]
-```
+Calls: Session → Tutor → Payment
 
 ---
 
-**Orchestration B: Get Tutor Sessions**
+### Process Booking — Port 5104
 
-**Input**: `tutorId` (path parameter)
-
-**Exact Flow**:
-
-1. **Fetch all sessions for tutor**
-   ```
-   GET http://session:5003/session/all?tutorId=tutor-uuid-123
-   Response: [
-     { sessionId, tutorId, studentId, tutorSubjectId, ... },
-     ...
-   ]
-   ```
-
-2. **Enrich with tutor data** (same as student endpoint):
-   ```
-   GET http://tutor:5002/tutor/{tutorId}
-   GET http://tutor:5002/tutor/{tutorId}/subjects
-   → Extract: name, imageURL, subject, hourlyRate
-   → Calculate: totalPrice
-   ```
-
-3. **Additionally, enrich with student data** ⚠️ (this is the difference):
-   ```
-   GET http://student:5001/student/{studentId}
-   Response: { studentId, name, imageURL, email, phone, ... }
-   ```
-
-**Output** (array):
-```json
-[
-  {
-    "sessionId": "...",
-    "tutorId": "...",
-    "studentId": "...",
-    "tutorName": "Dr. Alice Smith",
-    "tutorImageUrl": "https://...",
-    "studentName": "John Doe",
-    "studentImageUrl": "https://...",
-    "subjectName": "Mathematics",
-    "academicLevel": "GCSE",
-    "totalPrice": 35.00,
-    ...
-  }
-]
-```
-
----
-
-**Orchestration C: Get Single Session**
-
-**Input**: `sessionId` (path parameter)
-
-**Exact Flow**:
-
-1. **Fetch specific session**
-   ```
-   GET http://session:5003/session/session-uuid-789
-   Response: { sessionId, tutorId, studentId, tutorSubjectId, ... }
-   ```
-
-2. **Enrich with tutor & subject data** (same as tutor endpoint):
-   ```
-   GET http://tutor:5002/tutor/{tutorId}
-   GET http://tutor:5002/tutor/{tutorId}/subjects
-   ```
-
-3. **Enrich with student data** (same as tutor endpoint):
-   ```
-   GET http://student:5001/student/{studentId}
-   ```
-
-**Output** (single object):
-```json
-{
-  "sessionId": "...",
-  "tutorId": "...",
-  "studentId": "...",
-  "tutorName": "...",
-  "tutorImageUrl": "...",
-  "studentName": "...",
-  "studentImageUrl": "...",
-  "subjectName": "...",
-  "totalPrice": 35.00
-}
-```
-
-**Auth**: Not required
-
-**Calls**: Session (5003) → Tutor (5002) → Student (5001)
-
----
-
-### 3. Process Booking Service (Port 5104)
-Completes booking after successful payment.
-
-**Endpoint**:
-- `POST /process-booking/process-booking` - Process booking
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/process-booking/process-booking` | Confirm payment + mark session booked + send calendar invite to student |
 
 **Input**:
 ```json
 {
-  "stripe_session_id": "cs_live_abc123xyz"
+  "stripe_session_id": "cs_live_..."
 }
 ```
 
-**Headers Required**: `Authorization: Bearer <JWT_TOKEN>`
-
-**Exact Orchestration** (in sequence):
-
-1. **Validate JWT Token** ⚠️ **CRITICAL**
-   ```
-   Kong Gateway validates token signature & expiry
-   If invalid → 401 Unauthorized
-   If valid → Continue with claims available
-   ```
-
-2. **Verify Stripe Payment**
-   ```
-   POST http://payment:5007/payment/verify
-   Headers: Authorization (forwarded)
-   Body: { stripe_session_id: "cs_live_abc123xyz" }
-   Response: {
-     payment_status: "paid",
-     session_id: "session-uuid-789",
-     student_id: "student-uuid-456",
-     tutor_id: "tutor-uuid-123",
-     amount_total: 3500
-   }
-   ```
-
-3. **Update Session Status to "booked"**
-   ```
-   PUT http://session:5003/session/{sessionId from payment}
-   Headers: Authorization (forwarded)
-   Body: { status: "booked" }
-   Response: { sessionId, status, updatedAt, ... }
-   ```
-
-4. **Fetch Student Details**
-   ```
-   GET http://student:5001/student/{studentId from payment}
-   Response: {
-     studentId, name, email, phone, imageURL, ...
-   }
-   ```
-
-5. **Fetch Tutor Details**
-   ```
-   GET http://tutor:5002/tutor/{tutorId from payment}
-   Response: {
-     tutorId, name, clerkUserId, email, imageURL, ...
-   }
-   ```
-
-6. **Add Student to Google Calendar**
-   ```
-   POST http://calendar:5005/calendar/update-meeting
-   Headers: Authorization (forwarded)
-   Body: {
-     eventId: session.calendarEventId,
-     tutorClerkId: tutor.clerkUserId,
-     studentEmail: student.email
-   }
-   Response: { message, eventId }
-   ```
-
-**Final Output**:
+**Output** `200`:
 ```json
 {
-  "message": "Booking completed successfully",
-  "sessionId": "session-uuid-789",
-  "studentId": "student-uuid-456",
-  "tutorId": "tutor-uuid-123",
-  "status": "booked",
-  "amount_paid": 3500,
-  "meeting_link": "https://meet.google.com/abc-def-ghi",
+  "message": "Booking confirmed and calendar updated",
+  "sessionId": "uuid",
+  "student_email": "student@example.com",
   "student_name": "John Doe",
-  "tutor_name": "Dr. Alice Smith"
+  "tutor_name": "Alice Smith",
+  "amount_paid": 3500,
+  "start_time": "2026-04-10T14:00:00",
+  "end_time": "2026-04-10T15:00:00",
+  "subject": "Mathematics",
+  "status": "booked"
 }
 ```
 
-**Error Cases**:
-- `401 Unauthorized` - Invalid/expired JWT token
-- `400 Bad Request` - Payment verification failed (not paid)
-- `404 Not Found` - Session/student/tutor not found
-- `500 Internal Server Error` - Calendar API failed
+**Output** `207` (calendar update failed, booking still confirmed):
+```json
+{
+  "message": "Booking confirmed but calendar update failed",
+  "calendarError": "...",
+  ...same fields as 200...
+}
+```
 
-**Auth**: **Required (JWT token is critical)**
+**Errors**: `400` missing field · `401` invalid JWT · `402` payment not completed · `500` downstream failure
 
-**Calls** (in order): Token Validation → Payment (5007) → Session (5003) → Student (5001) → Tutor (5002) → Calendar (5005)
+Calls: Payment → Session → Tutor → Student → Calendar
 
 ---
 
-### 4. Cancel Session Service (Port 5101)
-Session cancellation (scaffolded - not yet implemented).
+### Create Session — Port 5105
 
-**Status**: ⚠️ Placeholder only
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/create-session/create-session` | Create session record + Google Calendar event + link them |
+
+**Input**:
+```json
+{
+  "tutorId":        "uuid",
+  "tutorSubjectId": "uuid",
+  "startTime":      "2026-04-10T14:00:00",
+  "endTime":        "2026-04-10T15:00:00",
+  "durationMins":   60,
+  "summary":        "Mathematics (A-Level)",
+  "timezone":       "Asia/Singapore"
+}
+```
+
+**Output** `201`:
+```json
+{
+  "sessionId":       "uuid",
+  "tutorId":         "uuid",
+  "tutorSubjectId":  "uuid",
+  "startTime":       "2026-04-10T14:00:00",
+  "endTime":         "2026-04-10T15:00:00",
+  "durationMins":    60,
+  "status":          "available",
+  "calendarEventId": "google_event_id",
+  "meetingLink":     "https://meet.google.com/abc-def-ghi"
+}
+```
+
+**Output** `207` (session created, calendar failed):
+```json
+{
+  "message": "Session created but calendar event failed",
+  "session": { ... },
+  "calendarError": "..."
+}
+```
+
+**Errors**: `400` missing fields · `401` invalid JWT · `409` overlapping session exists
+
+Calls: Session → Calendar → Session (patch)
 
 ---
 
-### 5. Rate Tutor Service (Port 5102)
-Tutor rating system (scaffolded - not yet implemented).
+### Update Session — Port 5106
 
-**Status**: ⚠️ Placeholder only
+| Method | Path | Description |
+|--------|------|-------------|
+| `PUT` | `/update-session/<sessionId>` | Update session times/subject + sync calendar. Blocked if status is `booked` |
+
+**Input**:
+```json
+{
+  "tutorSubjectId": "uuid",
+  "startTime":      "2026-04-10T15:00:00",
+  "endTime":        "2026-04-10T16:00:00",
+  "durationMins":   60,
+  "summary":        "Physics (A-Level)",
+  "timezone":       "Asia/Singapore"
+}
+```
+
+**Output** `200`: Updated session object (same shape as Create Session output)
+
+**Output** `207` (session updated, calendar sync failed):
+```json
+{
+  "message": "Session updated but calendar sync failed",
+  "session": { ... },
+  "calendarError": "..."
+}
+```
+
+**Errors**: `400` missing fields · `401` invalid JWT · `404` session not found · `409` session is already booked
+
+Calls: Session (read) → Session (update) → Tutor → Calendar
 
 ---
 
-## Common Workflows
+### Delete Session — Port 5107
 
-### Workflow 1: Student Books a Session
-```
-1. Search tutors → GET /tutor/search
-2. View tutor → GET /tutor/<id>
-3. Create session → POST /session/session
-4. Checkout → POST /checkout/checkout (returns Stripe URL)
-5. Pay via Stripe
-6. Process booking → POST /process-booking/process-booking (JWT required)
-   → Confirms payment, updates session, adds to calendar
-7. Meeting ready with Meet link
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| `DELETE` | `/delete-session/<sessionId>` | Delete session record + remove calendar event. Blocked if status is `booked` |
 
-### Workflow 2: Tutor View Sessions
-```
-1. Get sessions → GET /getsessions/tutor/<tutorId>/sessions
-   → Returns all sessions with student details & pricing
-2. View single session → GET /getsessions/session/<sessionId>
-   → Full enrichment: tutor + student + subjects
+**Input**: None (sessionId in path)
+
+**Output** `200`:
+```json
+{
+  "message": "Session and calendar event deleted successfully"
+}
 ```
 
-### Workflow 3: Rate After Session
+**Output** `207` (session deleted, calendar cleanup failed):
+```json
+{
+  "message": "Session deleted but calendar event cleanup failed",
+  "calendarError": "..."
+}
 ```
-1. Student rates tutor → PUT /tutor/<tutorId>/updateRating
-   → Updates averageRating & totalReviews
-2. Tutor profile now shows new rating
-3. Affects tutor search ranking
-```
+
+**Errors**: `401` invalid JWT · `404` session not found · `409` session is already booked
+
+Calls: Session (read) → Session (delete) → Tutor → Calendar
 
 ---
 
-## Database & Storage
+### Cancel Session — Port 5101 _(not yet implemented)_
 
-**PostgreSQL**: Student, Tutor, Session, Tutor Subjects data  
-**Google Calendar**: Calendar events + Meet links  
-**Stripe**: Payments (external API)  
+Placeholder — no active endpoints.
 
 ---
 
-## Key Points
+### Get Sessions — Port 5103
 
-✅ **12 Services**: 7 atomic + 5 composite  
-✅ **Kong Gateway**: Single entry point with JWT auth  
-✅ **Service Discovery**: Environment variables for inter-service URLs  
-✅ **Timeout**: 5 seconds for all service-to-service calls  
-✅ **CORS**: Enabled on all services  
+Retrieves sessions enriched with tutor/student details and calculated pricing.
 
-⚠️ **Not Yet Implemented**:
-- Email Service (scaffolded)
-- Meeting Service (scaffolded)
-- Cancel Session Service (scaffolded)
-- Rate Tutor Service (scaffolded)
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/getsessions/student/<studentId>/sessions` | All sessions for a student |
+| `GET`  | `/getsessions/tutor/<tutorId>/sessions` | All sessions for a tutor (includes student info) |
+| `GET`  | `/getsessions/session/<sessionId>` | Single session (fully enriched) |
+
+**Input**: ID in path only, no body
+
+**Output** `200` (array for student/tutor endpoints, single object for session endpoint):
+```json
+{
+  "sessionId":      "uuid",
+  "tutorId":        "uuid",
+  "studentId":      "uuid",
+  "tutorSubjectId": "uuid",
+  "startTime":      "2026-04-10T14:00:00",
+  "endTime":        "2026-04-10T15:00:00",
+  "durationMins":   60,
+  "status":         "booked",
+  "meetingLink":    "https://meet.google.com/abc-def-ghi",
+  "tutorName":      "Alice Smith",
+  "tutorImageUrl":  "https://...",
+  "subjectName":    "Mathematics",
+  "academicLevel":  "A-Level",
+  "totalPrice":     35.00,
+  "studentName":    "John Doe",       // tutor + single endpoints only
+  "studentImageUrl":"https://..."     // tutor + single endpoints only
+}
+```
+
+**Errors**: `404` no sessions found · `500` downstream failure
+
+Calls: Session → Tutor → Student (tutor/single endpoints only)
+
+---
+
+### Rate Tutor — Port 5102
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/rate-tutor/review` | Validate session, prevent duplicates, submit review, update tutor rating |
+
+**Input**:
+```json
+{
+  "session_id": "uuid",
+  "tutor_id":   "uuid",
+  "rating":     5,
+  "comment":    "Excellent session!"
+}
+```
+
+**Output** `200`:
+```json
+{
+  "message": "Review submitted and tutor rating updated",
+  "review": { "review_id": 1712345678000, ... },
+  "tutorRating": { "averageRating": 4.8, "totalReviews": 12 }
+}
+```
+
+**Output** `207` (review saved, rating update failed):
+```json
+{
+  "message": "Review submitted but tutor rating update failed",
+  "review": { ... },
+  "ratingError": "..."
+}
+```
+
+**Errors**: `400` missing/invalid fields · `404` session not found · `409` already reviewed this session · `500` OutSystems failure
+
+Calls: Session → OutSystems (read check) → OutSystems (write) → Tutor (update rating)
+
+---
+
+### Get Tutor — Port 5109
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/get-tutor/<tutorId>` | Return tutor profile with enriched reviews (student name + avatar attached) |
+
+**Input**: `tutorId` in path only, no body
+
+**Output** `200`:
+```json
+{
+  "tutorId":       "uuid",
+  "name":          "Alice Smith",
+  "imageURL":      "https://...",
+  "bio":           "...",
+  "averageRating": 4.8,
+  "totalReviews":  12,
+  "subjects": [
+    { "tutorSubjectId": "uuid", "subject": "Mathematics", "academicLevel": "A-Level", "hourlyRate": 35 }
+  ],
+  "reviews": [
+    {
+      "review_id":     1712345678000,
+      "session_id":    "uuid",
+      "tutor_id":      "uuid",
+      "student_id":    "uuid",
+      "rating":        5,
+      "comment":       "Excellent session!",
+      "createdAt":     "2026-04-02T10:30:00.000000Z",
+      "studentName":   "John Doe",
+      "studentAvatar": "https://..."
+    }
+  ]
+}
+```
+
+**Errors**: `404` tutor not found · `500` downstream failure
+
+Calls: Tutor → OutSystems → Student (per reviewer)
 
 ---
 
@@ -576,28 +811,30 @@ Tutor rating system (scaffolded - not yet implemented).
 
 ```bash
 cd backend
-docker-compose up -d
+docker-compose up --build -d
 ```
 
-All services start automatically. Access via: `http://localhost:8000`
+Local dev gateway (no Docker): `python local_gateway.py`  (runs on port 8000)
 
 ---
 
 ## Status Summary
 
-| Service | Type | Status | Critical |
-|---------|------|--------|----------|
-| Student | Atomic | ✅ Active | Yes |
-| Tutor | Atomic | ✅ Active | Yes |
-| Session | Atomic | ✅ Active | Yes |
-| Payment | Atomic | ✅ Active | Yes |
-| Calendar | Atomic | ✅ Active | Yes |
-| Meeting | Atomic | ⚠️ Scaffolded | No |
-| Email | Atomic | ⚠️ Scaffolded | No |
-| Checkout | Composite | ✅ Active | Yes |
-| Get Sessions | Composite | ✅ Active | Yes |
-| Process Booking | Composite | ✅ Active | Yes** |
-| Cancel Session | Composite | ⚠️ Scaffolded | No |
-| Rate Tutor | Composite | ⚠️ Scaffolded | No |
-
-** Requires JWT token for Kong auth
+| Service | Type | Port | Status |
+|---------|------|------|--------|
+| Student | Atomic | 5001 | ✅ Active |
+| Tutor | Atomic | 5002 | ✅ Active |
+| Session | Atomic | 5003 | ✅ Active |
+| Payment | Atomic | 5007 | ✅ Active |
+| Calendar | Atomic | 5005 | ✅ Active |
+| Email | Atomic | 5006 | ⚠️ Placeholder |
+| Meeting | Atomic | 5004 | ⚠️ Placeholder |
+| Checkout | Composite | 5100 | ✅ Active |
+| Process Booking | Composite | 5104 | ✅ Active |
+| Create Session | Composite | 5105 | ✅ Active |
+| Update Session | Composite | 5106 | ✅ Active |
+| Delete Session | Composite | 5107 | ✅ Active |
+| Cancel Session | Composite | 5101 | ⚠️ Placeholder |
+| Get Sessions | Composite | 5103 | ✅ Active |
+| Rate Tutor | Composite | 5102 | ✅ Active |
+| Get Tutor | Composite | 5109 | ✅ Active |

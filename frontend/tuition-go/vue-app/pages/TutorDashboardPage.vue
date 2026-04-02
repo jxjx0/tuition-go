@@ -2,12 +2,13 @@
 import { ref, computed, watch } from 'vue'
 import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
-import { mockReviews } from '../composables/useMockData'
 import { findTutorById } from "../composables/useTutors"
 import { useSessionService } from '../services/sessionService'
+import { useApi } from '../services/api'
+import { avatarUrl } from '../utils/avatar'
 
 function toUtcDate(d: string) {
-  return new Date(d + 'Z')
+  return new Date(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(d) ? d : d + 'Z')
 }
 
 function fmtDate(d: string) {
@@ -99,7 +100,7 @@ const { tutor, searchForTutor } = findTutorById()
 
 const sessions = ref<any[]>([])
 const sessionsLoading = ref(false)
-const sessionTab = ref<'booked' | 'available' | 'completed' | 'cancelled'>('booked')
+const sessionTab = ref<'booked' | 'available' | 'completed'>('booked')
 
 async function fetchSessions(id: string) {
   sessionsLoading.value = true
@@ -113,12 +114,17 @@ async function fetchSessions(id: string) {
   }
 }
 
-watch(tutorId, (id) => {
-  if (id) {
-    searchForTutor(id)
-    fetchSessions(id)
+const api = useApi()
+const tutorReviews = ref<any[]>([])
+
+async function fetchReviews(id: string) {
+  try {
+    const { data } = await api.get(`/get-tutor/${id}`)
+    tutorReviews.value = data?.reviews ?? []
+  } catch {
+    tutorReviews.value = []
   }
-}, { immediate: true })
+}
 
 function isBookedSession(session: any) {
   const st = (session.status || '').toLowerCase()
@@ -135,37 +141,36 @@ function isCompletedSession(session: any) {
   return st === 'completed'
 }
 
-function isCancelledSession(session: any) {
-  const st = (session.status || '').toLowerCase()
-  return st === 'cancelled'
-}
-
 const bookedSessions = computed(() => sessions.value.filter(isBookedSession))
 const availableSessions = computed(() => sessions.value.filter(isAvailableSession))
 const completedSessions = computed(() => sessions.value.filter(isCompletedSession))
-const cancelledSessions = computed(() => sessions.value.filter(isCancelledSession))
 
 const sessionTabs = computed(() => [
-  { key: 'booked', label: 'Booked', count: bookedSessions.value.length },
+  { key: 'booked',    label: 'Booked',    count: bookedSessions.value.length },
   { key: 'available', label: 'Available', count: availableSessions.value.length },
+  { key: 'completed', label: 'Completed', count: completedSessions.value.length },
 ])
 
 const displayedSessions = computed(() => {
   if (sessionTab.value === 'available') return availableSessions.value
+  if (sessionTab.value === 'completed') return completedSessions.value
   return bookedSessions.value
 })
 
-const tutorReviews = computed(() => {
-  if (!tutorId.value) return []
-  return mockReviews.filter(r => r.tutorId === tutorId.value)
-})
+watch(tutorId, (id) => {
+  if (id) {
+    searchForTutor(id)
+    fetchSessions(id)
+    fetchReviews(id)
+  }
+}, { immediate: true })
 
-const tutorStats = [
-  { value: '340', label: 'Total Sessions', bg: '#E8F0FE', iconColor: '#4A90D9' },
-  { value: '$22,100', label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
-  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0', label: 'Average Rating', bg: '#E8F0FE', iconColor: '#4A90D9' },
-  { value: tutor.value?.totalReviews ?? '0', label: 'Total Reviews', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
-]
+const tutorStats = computed(() => [
+  { value: '340',                                              label: 'Total Sessions', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: '$22,100',                                          label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0',   label: 'Average Rating', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: String(tutor.value?.totalReviews ?? '0'),           label: 'Total Reviews',  bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+])
 </script>
 
 <template>
@@ -266,7 +271,7 @@ const tutorStats = [
             <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" :class="session.status==='cancelled'?'opacity-60':''" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
                 <img
-                  :src="isBookedSession(session) && session.studentImageUrl ? session.studentImageUrl : 'https://api.dicebear.com/9.x/notionists/svg?seed=' + (session.studentId || 'default')"
+                  :src="avatarUrl(isBookedSession(session) ? session.studentImageUrl : null, session.studentId || 'default')"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div class="flex-1 min-w-0">
@@ -280,7 +285,11 @@ const tutorStats = [
                 </div>
                 <div class="flex flex-col gap-2 flex-shrink-0 items-end">
                   <span v-if="session.totalPrice" class="text-sm font-bold" style="color:#2EAA4F">${{ session.totalPrice.toFixed(2) }}</span>
-                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold" :style="isBookedSession(session)?'background-color:#E8F0FE;color:#4A90D9':'background-color:rgba(46,170,79,0.1);color:#2EAA4F'">{{ isBookedSession(session)?'Booked':'Available' }}</span>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                    :style="isBookedSession(session) ? 'background-color:#E8F0FE;color:#4A90D9'
+                          : isCompletedSession(session) ? 'background-color:rgba(124,58,237,0.1);color:#7C3AED'
+                          : 'background-color:rgba(46,170,79,0.1);color:#2EAA4F'"
+                  >{{ isBookedSession(session) ? 'Booked' : isCompletedSession(session) ? 'Completed' : 'Available' }}</span>
                 </div>
               </div>
             </div>
@@ -292,11 +301,11 @@ const tutorStats = [
         <div>
           <h2 class="text-lg font-bold mb-4" style="color:#1B3A5C">Recent Reviews</h2>
           <div class="space-y-3">
-            <div v-for="review in tutorReviews" :key="review.id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
+            <div v-for="review in tutorReviews" :key="review.review_id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
               <div class="flex items-center gap-2 mb-2">
-                <img :src="review.studentAvatar" :alt="review.studentName" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
+                <img :src="avatarUrl(review.studentAvatar, review.student_id)" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold truncate" style="color:#1B3A5C">{{ review.studentName }}</p>
+                  <p class="text-xs font-semibold" style="color:#1B3A5C">{{ review.studentName || 'Anonymous' }}</p>
                   <StarRating :modelValue="review.rating" size="sm"/>
                 </div>
               </div>

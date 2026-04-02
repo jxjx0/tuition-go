@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUser } from '@clerk/vue'
 import { useSessionService } from '../services/sessionService'
 import { findTutorById } from '../composables/useTutors'
+import { avatarUrl } from '../utils/avatar'
 
 const route = useRoute()
 const router = useRouter()
@@ -248,7 +249,7 @@ async function deleteSession() {
               <!-- Student -->
               <div v-if="session.studentName" class="flex items-center gap-4 p-4 rounded-xl" style="background-color:#F5F7FA;border:1px solid #E8F0FE">
                 <img
-                  :src="session.studentImageUrl || 'https://api.dicebear.com/9.x/notionists/svg?seed=' + session.studentId"
+                  :src="avatarUrl(session.studentImageUrl, session.studentId)"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div>
@@ -362,16 +363,13 @@ async function deleteSession() {
                 This session has been booked and cannot be edited.
               </div>
               <p v-if="saveError" class="text-xs" style="color:#E74C3C">{{ saveError }}</p>
-              <div class="flex justify-between items-center pt-2" style="border-top:1px solid #E8F0FE">
-                <button disabled class="px-5 py-2.5 rounded-xl text-sm font-semibold opacity-50 cursor-not-allowed" style="background-color:rgba(231,76,60,0.08);color:#E74C3C">
-                  Cancel Session
-                </button>
+              <div class="flex justify-end items-center pt-2" style="border-top:1px solid #E8F0FE">
                 <button
                   v-if="isCompletable"
                   @click="completeSession"
                   :disabled="completing"
                   class="px-6 py-2.5 rounded-xl text-sm font-bold text-white disabled:opacity-50 flex items-center gap-2"
-                  style="background-color:#2EAA4F"
+                  style="background-color:#7C3AED"
                 >
                   <svg v-if="completing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
