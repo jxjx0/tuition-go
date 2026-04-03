@@ -25,7 +25,11 @@ const tutorReviews = ref<any[]>([])
 
 const sessions = ref<any[]>([])
 const sessionsLoading = ref(true)
-const availableSessions = computed(() => sessions.value.filter(s => s.status === 'available'))
+const availableSessions = computed(() =>
+  sessions.value
+    .filter(s => s.status === 'available')
+    .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+)
 
 onMounted(async () => {
   const [tutorResult, sessionsResult] = await Promise.allSettled([
