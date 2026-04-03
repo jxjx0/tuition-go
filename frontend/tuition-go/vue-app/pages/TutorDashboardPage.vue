@@ -141,9 +141,18 @@ function isCompletedSession(session: any) {
   return st === 'completed'
 }
 
-const bookedSessions = computed(() => sessions.value.filter(isBookedSession))
-const availableSessions = computed(() => sessions.value.filter(isAvailableSession))
-const completedSessions = computed(() => sessions.value.filter(isCompletedSession))
+const bookedSessions = computed(() =>
+  sessions.value.filter(isBookedSession)
+    .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+)
+const availableSessions = computed(() =>
+  sessions.value.filter(isAvailableSession)
+    .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+)
+const completedSessions = computed(() =>
+  sessions.value.filter(isCompletedSession)
+    .sort((a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+)
 
 const sessionTabs = computed(() => [
   { key: 'booked',    label: 'Booked',    count: bookedSessions.value.length },
@@ -271,7 +280,8 @@ const tutorStats = computed(() => [
             <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" :class="session.status==='cancelled'?'opacity-60':''" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
                 <img
-                  :src="avatarUrl(isBookedSession(session) ? session.studentImageUrl : null, session.studentId || 'default')"
+                  v-if="!isAvailableSession(session)"
+                  :src="avatarUrl(session.studentImageUrl, session.studentId || 'default')"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div class="flex-1 min-w-0">
