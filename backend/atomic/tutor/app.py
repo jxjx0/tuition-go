@@ -33,7 +33,7 @@ api = Api(app, doc="/docs",
 tutor_subject_model = api.model('TutorSubject', {
     'tutorSubjectId': fields.String(description='Tutor subject UUID', example='d2eebc99-9c0b-4ef8-bb6d-6bb9bd380a44'),
     'subject': fields.String(description='Subject name', example='Mathematics'),
-    'academicLevel': fields.String(description='Academic level', example='A-Level'),
+    'academicLevel': fields.String(description='Academic level', example='Primary 5'),
     'hourlyRate': fields.Float(description='Hourly rate in SGD', example=80.0),
 })
 
@@ -66,7 +66,7 @@ update_rating_input = api.model('UpdateRatingInput', {
 
 add_subject_input = api.model('AddSubjectInput', {
     'subject': fields.String(required=True, description='Subject name', example='Mathematics'),
-    'academicLevel': fields.String(required=True, description='Academic level', example='A-Level'),
+    'academicLevel': fields.String(required=True, description='Academic level', example='Primary 5'),
     'hourlyRate': fields.Float(required=True, description='Hourly rate in SGD (must be > 0)', example=80.0),
 })
 
