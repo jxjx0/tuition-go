@@ -19,6 +19,7 @@ api = Api(app, doc="/docs",
 SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:5003")
 TUTOR_SERVICE_URL = os.environ.get("TUTOR_SERVICE_URL", "http://localhost:5002")
 STUDENT_SERVICE_URL = os.environ.get("STUDENT_SERVICE_URL", "http://localhost:5001")
+REVIEW_SERVICE_URL = os.environ.get("REVIEW_SERVICE_URL", "https://personal-rkcavjxu.outsystemscloud.com/Review/rest/Review/")
 
 
 def _get_auth_headers():
@@ -47,7 +48,8 @@ enhanced_session_model = api.model('EnhancedSession', {
     'academicLevel': fields.String(description='The academic level from TutorSubjects'),
     'totalPrice': fields.Float(description='Total price calculated from hourly rate and duration'),
     'studentName': fields.String(description='The student full name'),
-    'studentImageUrl': fields.String(description='The student image URL')
+    'studentImageUrl': fields.String(description='The student image URL'),
+    'review': fields.Raw(description='Review for this session, if any')
 })
 
 
@@ -176,7 +178,24 @@ class SessionDetail(Resource):
             # 2. Enhance the session with tutor, subject, pricing and student details
             enhanced_sessions = _enrich_sessions_for_tutor([session])
             
-            return enhanced_sessions[0], 200
+            enriched = enhanced_sessions[0]
+        
+            try:
+                review_response = requests.get(
+                    f"{REVIEW_SERVICE_URL}/sess_review/{sessionId}",
+                    timeout=5
+                )
+                if review_response.status_code == 200:
+                    review_data = review_response.json()
+                    # API returns a list or single object — normalise to single or None
+                    reviews = review_data.get("data", {}).get("reviews", [])
+                    enriched['review'] = reviews[0] if reviews else None
+                else:
+                    enriched['review'] = None
+            except Exception:
+                enriched['review'] = None  # Non-fatal — don't break the whole response
+
+            return enriched, 200
             
         except requests.exceptions.RequestException as e:
             print(f"Request error: {str(e)}")

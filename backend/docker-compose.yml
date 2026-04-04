@@ -265,6 +265,7 @@ services:
       - SESSION_SERVICE_URL=http://session:5003
       - TUTOR_SERVICE_URL=http://tutor:5002
       - REVIEW_SERVICE_URL=https://personal-rkcavjxu.outsystemscloud.com/Review/rest/Review
+
     networks:
       - tuition-network
     restart: unless-stopped
@@ -296,6 +297,7 @@ services:
       - SESSION_SERVICE_URL=http://session:5003
       - TUTOR_SERVICE_URL=http://tutor:5002
       - STUDENT_SERVICE_URL=http://student:5001
+      - REVIEW_SERVICE_URL=https://personal-rkcavjxu.outsystemscloud.com/Review/rest/Review
     networks:
       - tuition-network
     restart: unless-stopped

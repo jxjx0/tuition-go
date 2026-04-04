@@ -31,6 +31,7 @@ const loadError = ref("");
 const session = ref<any>(null);
 const loading = ref(true);
 const alreadyReviewed = ref(false);
+const isEditMode = ref(false);
 
 const ratingLabel = computed(() => {
   const l: Record<number, string> = { 1: "Poor", 2: "Fair", 3: "Good", 4: "Very Good", 5: "Excellent" };
@@ -47,11 +48,16 @@ onMounted(async () => {
     session.value = data
 
     // Check for duplicate review
-    try {
+   try {
       const { data: tutorData } = await api.get(`/get-tutor/${data.tutorId}`)
       const reviews: any[] = tutorData?.reviews ?? []
-      if (reviews.some((r: any) => r.session_id === sessionId)) {
-        alreadyReviewed.value = true
+      const existing = reviews.find((r: any) => r.session_id === sessionId)
+
+      if (existing) {
+        isEditMode.value = true         
+        rating.value = existing.rating  
+        comment.value = existing.comment 
+        // Do NOT set alreadyReviewed = true — we want to show the form
       }
     } catch {
       // Non-fatal: if check fails, still show form
@@ -110,7 +116,7 @@ async function submitReview() {
       </div>
 
       <!-- Already reviewed -->
-      <div v-else-if="alreadyReviewed" class="rounded-2xl border p-8 text-center" style="background-color:#fff;border-color:#E8F0FE">
+      <!-- <div v-else-if="alreadyReviewed" class="rounded-2xl border p-8 text-center" style="background-color:#fff;border-color:#E8F0FE">
         <div class="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style="background-color:rgba(74,144,217,0.1)">
           <svg class="w-10 h-10" style="color:#4A90D9" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
@@ -121,12 +127,12 @@ async function submitReview() {
         <router-link to="/dashboard" class="inline-block px-8 py-3 rounded-xl text-sm font-semibold text-white" style="background-color:#4A90D9">
           Back to Dashboard
         </router-link>
-      </div>
+      </div> -->
 
       <!-- Review form -->
       <div v-else-if="session && !submitted" class="rounded-2xl border overflow-hidden" style="background-color: #fff; border-color: #e8f0fe">
         <div class="p-6" style="background: linear-gradient(135deg, #1b3a5c 0%, #4a90d9 100%)">
-          <h1 class="text-2xl font-extrabold text-white">Leave a Review</h1>
+          <h1 class="text-2xl font-extrabold text-white">{{ isEditMode ? 'Update Your Review' : 'Leave a Review' }}</h1>
           <p class="text-sm mt-1" style="color: rgba(255, 255, 255, 0.75)">Share your experience with {{ session.tutorName }}</p>
         </div>
         <div class="p-6 space-y-6">
@@ -179,7 +185,7 @@ async function submitReview() {
             class="w-full py-4 rounded-xl text-base font-bold text-white hover:opacity-90 shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
             style="background-color: #4a90d9"
           >
-            {{ isSubmitting ? "Submitting..." : "Submit Review" }}
+            {{ isSubmitting ? (isEditMode ? 'Updating...' : 'Submitting...') : (isEditMode ? 'Update Review' : 'Submit Review') }}
           </button>
         </div>
       </div>
@@ -191,7 +197,7 @@ async function submitReview() {
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
           </svg>
         </div>
-        <h2 class="text-2xl font-extrabold mb-2" style="color: #1b3a5c">Review Submitted!</h2>
+        <h2 class="text-2xl font-extrabold mb-2" style="color: #1b3a5c">{{ isEditMode ? 'Review Updated!' : 'Review Submitted!' }}</h2>
         <p class="text-sm mb-6" style="color: #1b3a5c; opacity: 0.7">Thank you for your feedback. Your review helps other students find great tutors.</p>
         <router-link to="/dashboard" class="inline-block px-8 py-3 rounded-xl text-sm font-semibold text-white" style="background-color: #4a90d9">
           Back to Dashboard
