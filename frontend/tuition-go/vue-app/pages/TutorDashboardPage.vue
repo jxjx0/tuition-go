@@ -174,11 +174,20 @@ watch(tutorId, (id) => {
   }
 }, { immediate: true })
 
+const totalSessions = computed(() => sessions.value.length)
+
+const totalEarnings = computed(() => {
+  const total = sessions.value
+    .filter(s => ['booked', 'completed', 'confirmed'].includes((s.status || '').toLowerCase()))
+    .reduce((sum: number, s: any) => sum + (s.totalPrice ?? 0), 0)
+  return `$${total.toFixed(2)}`
+})
+
 const tutorStats = computed(() => [
-  { value: '340',                                              label: 'Total Sessions', bg: '#E8F0FE',              iconColor: '#4A90D9' },
-  { value: '$22,100',                                          label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
-  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0',   label: 'Average Rating', bg: '#E8F0FE',              iconColor: '#4A90D9' },
-  { value: String(tutor.value?.totalReviews ?? '0'),           label: 'Total Reviews',  bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: totalSessions.value, label: 'Total Sessions', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: totalEarnings.value, label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0',  label: 'Average Rating', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: String(tutor.value?.totalReviews ?? '0'), label: 'Total Reviews',  bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
 ])
 </script>
 
@@ -188,7 +197,7 @@ const tutorStats = computed(() => [
       <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-10">
         <div>
           <h1 class="text-3xl font-extrabold" style="color:#1B3A5C">Tutor Dashboard</h1>
-          <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Welcome back, James. Manage your sessions and availability.</p>
+          <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Welcome back, {{ tutor?.name ?? 'Tutor' }}. Manage your sessions and availability.</p>
         </div>
         <div class="flex gap-4">
           <button @click="showCreateSlot=!showCreateSlot" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#2EAA4F">+ Create Session Slot</button>
