@@ -130,19 +130,23 @@ def process_email_message(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
 def start_rabbitmq_consumer():
-    """Starts the RabbitMQ consumer."""
-    try:
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
-        channel = connection.channel()
-        channel.exchange_declare(exchange="tuitiongo.email", exchange_type="direct", durable=True)
-        channel.queue_declare(queue=QUEUE_NAME, durable=True)
-        channel.queue_bind(queue=QUEUE_NAME, exchange="tuitiongo.email", routing_key="notification.email")
-        channel.basic_consume(queue=QUEUE_NAME, on_message_callback=process_email_message)
+    """Starts the RabbitMQ consumer with automatic reconnection on failure."""
+    import time
+    while True:
+        try:
+            connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+            channel = connection.channel()
+            channel.exchange_declare(exchange="tuitiongo.email", exchange_type="direct", durable=True)
+            channel.queue_declare(queue=QUEUE_NAME, durable=True)
+            channel.queue_bind(queue=QUEUE_NAME, exchange="tuitiongo.email", routing_key="notification.email")
+            channel.basic_qos(prefetch_count=1)
+            channel.basic_consume(queue=QUEUE_NAME, on_message_callback=process_email_message)
 
-        print(f" [*] Waiting for messages in {QUEUE_NAME}. To exit press CTRL+C")
-        channel.start_consuming()
-    except Exception as e:
-        print(f" [ERROR] RabbitMQ connection failed: {e}")
+            print(f" [*] Waiting for messages in {QUEUE_NAME}. To exit press CTRL+C")
+            channel.start_consuming()
+        except Exception as e:
+            print(f" [ERROR] RabbitMQ consumer error: {e}. Retrying in 5 seconds...")
+            time.sleep(5)
 
 @app.route("/health", methods=["GET"])
 def health_check():
