@@ -332,7 +332,7 @@ class CancelMeeting(Resource):
                 calendarId='primary',
                 eventId=event_id,
                 body=event,
-                sendUpdates='all'  # automatically sends cancellation notice to student
+                sendUpdates='none'
             ).execute()
 
             logger.info(f"Event {event_id}: student {student_email} removed from attendees")
