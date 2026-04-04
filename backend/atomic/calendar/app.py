@@ -227,7 +227,7 @@ class UpdateMeeting(Resource):
                 calendarId='primary',
                 eventId=event_id,
                 body=event,
-                sendUpdates='all'  # emails invite to student automatically
+                sendUpdates='none'
             ).execute()
 
             logger.info(f"Event {event_id} updated with student {student_email}")
