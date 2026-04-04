@@ -410,11 +410,9 @@ class DeleteTutor(Resource):
             return {"error": str(e)}, 500
 
 
-#PUT update reviews portion of tutor
-# get the new review from the student & calculate what is the new no. of review and average rating 
+#PUT update reviews portion of tutor (averageRating and totalReviews)
 @api.route("/updateRating")
 class UpdateTutorRating(Resource):
-
 
     def put(self):
         data = request.get_json()
@@ -423,45 +421,58 @@ class UpdateTutorRating(Resource):
             return {"error": "No input data provided"}, 400
 
         tutor_id = data.get("tutorId")
-        new_rating = data.get("newRating")
+        average_rating = data.get("averageRating")
+        total_reviews = data.get("totalReviews")
 
-        if not tutor_id or new_rating is None:
-            return {"error": "tutorId and rating are required"}, 400
+        if not tutor_id or average_rating is None or total_reviews is None:
+            return {
+                "error": "tutorId, averageRating and totalReviews are required"
+            }, 400
 
-        # Ensure rating is valid (1 to 5 for example)
-        if not isinstance(new_rating, (int, float)) or not (1 <= new_rating <= 5):
-            return {"error": "Rating must be a number between 1 and 5"}, 400
+        # Validate rating
+        if not isinstance(average_rating, (int, float)) or not (0 <= average_rating <= 5):
+            return {"error": "averageRating must be between 0 and 5"}, 400
+
+        # Validate totalReviews
+        if not isinstance(total_reviews, int) or total_reviews < 0:
+            return {"error": "totalReviews must be a positive integer"}, 400
 
         try:
-            # Get current tutor data
-            response_tutor = (supabase.table("Tutor").select("name, averageRating, totalReviews").eq("tutorId", tutor_id).single().execute())
+
+            # Check tutor exists
+            response_tutor = (
+                supabase.table("Tutor")
+                .select("name")
+                .eq("tutorId", tutor_id)
+                .single()
+                .execute()
+            )
 
             if not response_tutor.data:
                 return {"error": "Tutor not found"}, 404
 
-            current_avg = response_tutor.data["averageRating"]
-            current_total = response_tutor.data["totalReviews"]
-            tutor_name=response_tutor.data["name"]
+            tutor_name = response_tutor.data["name"]
 
-            #Compute new values
-            new_total = current_total + 1
-
-            new_average = ((current_avg * current_total) + new_rating) / new_total
-
-            # Optional: round to 1 decimal place
-            new_average = round(new_average, 1)
-
-            # Update timestamp (UTC)
+            # Update timestamp
             updated_time = datetime.now(timezone.utc).isoformat()
 
             # Update tutor record
-            update_response = (supabase.table("Tutor").update({"averageRating": new_average,"totalReviews": new_total, "updatedAt":updated_time}).eq("tutorId", tutor_id).execute())
+            update_response = (
+                supabase.table("Tutor")
+                .update({
+                    "averageRating": average_rating,
+                    "totalReviews": total_reviews,
+                    "updatedAt": updated_time
+                })
+                .eq("tutorId", tutor_id)
+                .execute()
+            )
 
             return {
                 "tutorId": tutor_id,
-                "name":tutor_name,
-                "newAverageRating": new_average,
-                "totalReviews": new_total
+                "name": tutor_name,
+                "averageRating": average_rating,
+                "totalReviews": total_reviews
             }, 200
 
         except Exception as e:
