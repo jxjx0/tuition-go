@@ -79,13 +79,17 @@ def _format_email_when(session_start_utc, end_time_str):
     display_start = session_start_utc + timedelta(hours=8)
     try:
         base_end = datetime.fromisoformat(end_time_str.replace(" ", "T").replace("Z", "+00:00"))
-        display_end = base_end.astimezone(timezone.utc) + timedelta(hours=8)
+        display_end = base_end.astimezone(timezone.utc)
     except Exception:
         display_end = display_start + timedelta(hours=1)
 
+    def _fmt_time(dt):
+        fmt = "%I:%M%p" if dt.minute != 0 else "%I%p"
+        return dt.strftime(fmt).lower().lstrip("0") or "12am"
+
     fmt_date       = display_start.strftime("%A %d %b %Y")
-    fmt_start_time = display_start.strftime("%I%p").lower().lstrip("0") or "12am"
-    fmt_end_time   = display_end.strftime("%I%p").lower().lstrip("0") or "12am"
+    fmt_start_time = _fmt_time(display_start)
+    fmt_end_time   = _fmt_time(display_end)
     return f"{fmt_date} ⋅ {fmt_start_time} – {fmt_end_time} (Singapore Standard Time)"
 
 
