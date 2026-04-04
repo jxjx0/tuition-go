@@ -20,7 +20,6 @@ import TutorEditProfilePage from './pages/TutorEditProfilePage.vue'
 import TutorEditProfilePage2 from './pages/TutorEditProfilePage2.vue'
 import AuthRedirectPage from './pages/AuthRedirectPage.vue'
 import StudentEditProfilePage from './pages/StudentEditProfilePage.vue'
-import PaymentPage from './pages/PaymentPage.vue'
 import PaymentSuccess from './pages/PaymentSuccess.vue'
 import PaymentFailed from './pages/PaymentFailed.vue'
 
@@ -46,8 +45,7 @@ const routes = [
   },
   { path: '/book/:sessionId', name: 'book-session', component: BookSessionPage, props: true },
   { path: '/session/:id', name: 'session-detail', component: SessionDetailPage, props: true, meta: { requiresAuth: true } },
-  { path: '/review/', name: 'review', component: ReviewPage, props: true },
-  // { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true },
+  { path: '/review/:sessionId', name: 'review', component: ReviewPage, props: true, meta: { requiresAuth: true, role: 'student' } },
   { path: '/tutor-profile/:id', name: 'TutorProfile2', component: TutorEditProfilePage2 },
   { path: '/tutor-session/:sessionId', name: 'TutorSessionEdit', component: TutorSessionEditPage, meta: { requiresAuth: true, role: 'tutor' } },
   { path: '/tutor-profile2/', name: 'TutorProfile', component: TutorEditProfilePage },
@@ -58,7 +56,6 @@ const routes = [
     meta: { requiresAuth: true, role: 'student' },
   },
   { path: '/auth-redirect', name: 'auth-redirect', component: AuthRedirectPage },
-  { path: '/payment', name: 'payment', component: PaymentPage },
   { path: '/paymentsuccess', name: 'paymentsuccess', component: PaymentSuccess },
   { path: '/paymentfailed', name: 'paymentfailed', component: PaymentFailed },
   { path: '/debug-meeting', name: 'debug-meeting', component: () => import('./pages/TestMeetingPage.vue') },

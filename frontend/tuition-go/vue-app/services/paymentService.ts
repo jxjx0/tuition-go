@@ -15,7 +15,12 @@ export function usePaymentService() {
     return api.post("/payments/create-checkout-session", data)
   }
 
+  function getStripeSession(stripeSessionId: string) {
+    return api.get(`/payments/stripe-session/${stripeSessionId}`)
+  }
+
   return {
-    createCheckoutSession
+    createCheckoutSession,
+    getStripeSession
   }
 }

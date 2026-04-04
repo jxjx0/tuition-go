@@ -8,7 +8,7 @@ import { useApi } from '../services/api'
 import { avatarUrl } from '../utils/avatar'
 
 function toUtcDate(d: string) {
-  return new Date(d + 'Z')
+  return new Date(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(d) ? d : d + 'Z')
 }
 
 function fmtDate(d: string) {
@@ -114,12 +114,17 @@ async function fetchSessions(id: string) {
   }
 }
 
-watch(tutorId, (id) => {
-  if (id) {
-    searchForTutor(id)
-    fetchSessions(id)
+const api = useApi()
+const tutorReviews = ref<any[]>([])
+
+async function fetchReviews(id: string) {
+  try {
+    const { data } = await api.get(`/get-tutor/${id}`)
+    tutorReviews.value = data?.reviews ?? []
+  } catch {
+    tutorReviews.value = []
   }
-}, { immediate: true })
+}
 
 function isBookedSession(session: any) {
   const st = (session.status || '').toLowerCase()
@@ -136,9 +141,18 @@ function isCompletedSession(session: any) {
   return st === 'completed'
 }
 
-const bookedSessions = computed(() => sessions.value.filter(isBookedSession))
-const availableSessions = computed(() => sessions.value.filter(isAvailableSession))
-const completedSessions = computed(() => sessions.value.filter(isCompletedSession))
+const bookedSessions = computed(() =>
+  sessions.value.filter(isBookedSession)
+    .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+)
+const availableSessions = computed(() =>
+  sessions.value.filter(isAvailableSession)
+    .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+)
+const completedSessions = computed(() =>
+  sessions.value.filter(isCompletedSession)
+    .sort((a: any, b: any) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
+)
 
 const sessionTabs = computed(() => [
   { key: 'booked',    label: 'Booked',    count: bookedSessions.value.length },
@@ -152,27 +166,28 @@ const displayedSessions = computed(() => {
   return bookedSessions.value
 })
 
-const api = useApi()
-const tutorReviews = ref<any[]>([])
-
-async function fetchReviews(id: string) {
-  try {
-    const { data } = await api.get(`/get-tutor/${id}`)
-    tutorReviews.value = data?.reviews ?? []
-  } catch {
-    tutorReviews.value = []
-  }
-}
-
 watch(tutorId, (id) => {
-  if (id) fetchReviews(id)
+  if (id) {
+    searchForTutor(id)
+    fetchSessions(id)
+    fetchReviews(id)
+  }
 }, { immediate: true })
 
+const totalSessions = computed(() => sessions.value.length)
+
+const totalEarnings = computed(() => {
+  const total = sessions.value
+    .filter(s => ['booked', 'completed', 'confirmed'].includes((s.status || '').toLowerCase()))
+    .reduce((sum: number, s: any) => sum + (s.totalPrice ?? 0), 0)
+  return `$${total.toFixed(2)}`
+})
+
 const tutorStats = computed(() => [
-  { value: '340',                                              label: 'Total Sessions', bg: '#E8F0FE',              iconColor: '#4A90D9' },
-  { value: '$22,100',                                          label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
-  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0',   label: 'Average Rating', bg: '#E8F0FE',              iconColor: '#4A90D9' },
-  { value: String(tutor.value?.totalReviews ?? '0'),           label: 'Total Reviews',  bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: totalSessions.value, label: 'Total Sessions', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: totalEarnings.value, label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0',  label: 'Average Rating', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: String(tutor.value?.totalReviews ?? '0'), label: 'Total Reviews',  bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
 ])
 </script>
 
@@ -182,7 +197,7 @@ const tutorStats = computed(() => [
       <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-10">
         <div>
           <h1 class="text-3xl font-extrabold" style="color:#1B3A5C">Tutor Dashboard</h1>
-          <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Welcome back, James. Manage your sessions and availability.</p>
+          <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Welcome back, {{ tutor?.name ?? 'Tutor' }}. Manage your sessions and availability.</p>
         </div>
         <div class="flex gap-4">
           <button @click="showCreateSlot=!showCreateSlot" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#2EAA4F">+ Create Session Slot</button>
@@ -274,7 +289,8 @@ const tutorStats = computed(() => [
             <div v-for="session in displayedSessions" :key="session.sessionId" class="rounded-2xl border p-5 hover:shadow-sm cursor-pointer" :class="session.status==='cancelled'?'opacity-60':''" style="background-color:#fff;border-color:#E8F0FE" @click="$router.push(`/tutor-session/${session.sessionId}`)">
               <div class="flex items-start gap-4">
                 <img
-                  :src="avatarUrl(isBookedSession(session) ? session.studentImageUrl : null, session.studentId || 'default')"
+                  v-if="!isAvailableSession(session)"
+                  :src="avatarUrl(session.studentImageUrl, session.studentId || 'default')"
                   class="w-12 h-12 rounded-xl object-cover flex-shrink-0" crossorigin="anonymous" style="background-color:#E8F0FE"
                 />
                 <div class="flex-1 min-w-0">
@@ -304,11 +320,11 @@ const tutorStats = computed(() => [
         <div>
           <h2 class="text-lg font-bold mb-4" style="color:#1B3A5C">Recent Reviews</h2>
           <div class="space-y-3">
-            <div v-for="review in tutorReviews" :key="review.id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
+            <div v-for="review in tutorReviews" :key="review.review_id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
               <div class="flex items-center gap-2 mb-2">
                 <img :src="avatarUrl(review.studentAvatar, review.student_id)" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
                 <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold truncate" style="color:#1B3A5C">{{ review.studentName }}</p>
+                  <p class="text-xs font-semibold" style="color:#1B3A5C">{{ review.studentName || 'Anonymous' }}</p>
                   <StarRating :modelValue="review.rating" size="sm"/>
                 </div>
               </div>

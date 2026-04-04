@@ -26,6 +26,7 @@ services:
       - delete-session
       - cancel-session
       - rate-tutor
+      - get-tutor
       - get-sessions
     restart: unless-stopped
   # ==================== RABBITMQ SERVICES ====================
@@ -164,6 +165,7 @@ services:
       - SESSION_SERVICE_URL=http://session:5003
       - TUTOR_SERVICE_URL=http://tutor:5002
       - PAYMENT_SERVICE_URL=http://payment:5007
+      - STUDENT_SERVICE_URL=http://student-service:5001
     networks:
       - tuition-network
     restart: unless-stopped
@@ -259,6 +261,25 @@ services:
     container_name: rate-tutor-service
     ports:
       - "5102:5102"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - REVIEW_SERVICE_URL=https://personal-rkcavjxu.outsystemscloud.com/Review/rest/Review
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
+  get-tutor:
+    build:
+      context: ./composite/get_tutor
+      dockerfile: Dockerfile
+    container_name: get-tutor-service
+    ports:
+      - "5109:5109"
+    environment:
+      - TUTOR_SERVICE_URL=http://tutor:5002
+      - STUDENT_SERVICE_URL=http://student:5001
+      - REVIEW_SERVICE_URL=https://personal-rkcavjxu.outsystemscloud.com/Review/rest/Review
     networks:
       - tuition-network
     restart: unless-stopped

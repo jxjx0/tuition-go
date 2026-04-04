@@ -34,7 +34,7 @@ class CreateCheckoutSession(Resource):
         data = request.get_json()
         session = stripe.checkout.Session.create(
             mode="payment",
-             line_items=[{
+            line_items=[{
             "price_data": {
                 "currency": "sgd",
                 "product_data": {
@@ -50,6 +50,10 @@ class CreateCheckoutSession(Resource):
                     "lesson_date": data["lesson_date"]
             }
             }],
+                customer_email=data.get("student_email"),
+                payment_intent_data={
+                    "receipt_email": data.get("student_email"), 
+                },
                 client_reference_id=str(data["session_id"]),
                 metadata={
                     "session_id": str(data["session_id"]),
@@ -57,7 +61,7 @@ class CreateCheckoutSession(Resource):
                     "tutor_id": str(data.get("tutor_id", "")),
                 },
                 success_url="http://localhost:5173/paymentSuccess?stripe_session_id={CHECKOUT_SESSION_ID}",
-                cancel_url="http://localhost:5173/paymentFailed"
+                cancel_url="http://localhost:5173/paymentFailed?stripe_session_id={CHECKOUT_SESSION_ID}"
             )
 
         return jsonify({"url": session.url})
@@ -83,6 +87,23 @@ class VerifyPayment(Resource):
             "amount_total": stripe_session.amount_total,
         }, 200
 
+      
+@api.route("/stripe-session/<string:stripe_session_id>")
+class GetStripeSession(Resource):
+    def get(self, stripe_session_id):
+        """Retrieve Stripe session metadata without requiring payment to be completed."""
+        try:
+            stripe_session = stripe.checkout.Session.retrieve(stripe_session_id)
+            metadata = stripe_session.metadata
+            return {
+                "session_id": metadata.get("session_id"),
+                "student_id": metadata.get("student_id"),
+                "tutor_id": metadata.get("tutor_id"),
+                "amount_total": stripe_session.amount_total,
+                "payment_status": stripe_session.payment_status,
+            }, 200
+        except stripe.error.InvalidRequestError:
+            return {"message": "Stripe session not found"}, 404
 
 @api.route("/refund")
 class ProcessRefund(Resource):

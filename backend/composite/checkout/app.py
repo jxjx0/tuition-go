@@ -16,6 +16,7 @@ api = Api(app, doc="/docs",
 SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:5003")
 TUTOR_SERVICE_URL = os.environ.get("TUTOR_SERVICE_URL", "http://localhost:5002")
 PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://localhost:5007")
+STUDENT_SERVICE_URL = os.environ.get("STUDENT_SERVICE_URL", "http://localhost:5001")
 
 checkout_input = api.model('CheckoutInput', {
     'session_id': fields.String(required=True, description='The session UUID to book'),
@@ -56,17 +57,19 @@ class Checkout(Resource):
         duration_mins = session.get("durationMins", 0)
         start_time = session.get("startTime", "")
 
-        # 2. Fetch tutor subjects from tutor atomic service
-        subjects_resp = requests.get(
-            f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}/subjects",
+        # 2. Fetch tutor (includes name + subjects[]) in one call
+        tutor_resp = requests.get(
+            f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}",
             timeout=5
         )
-        if subjects_resp.status_code != 200:
-            return {"message": "Failed to retrieve tutor subjects"}, 500
+        if tutor_resp.status_code != 200:
+            return {"message": "Failed to retrieve tutor"}, 500
 
-        subjects = subjects_resp.json()
+        tutor_data = tutor_resp.json()
+        tutor_name = tutor_data.get("name", "Tutor")
+
         matching = next(
-            (s for s in subjects if s.get("tutorSubjectId") == tutor_subject_id),
+            (s for s in tutor_data.get("subjects", []) if s.get("tutorSubjectId") == tutor_subject_id),
             None
         )
         if not matching:
@@ -76,14 +79,16 @@ class Checkout(Resource):
         subject_name = matching.get("subject", "Tuition")
         academic_level = matching.get("academicLevel", "")
 
-        # 3. Fetch tutor name from tutor atomic service
-        tutor_resp = requests.get(
-            f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}",
+        # 3. Fetch student to get email
+        student_resp = requests.get(
+            f"{STUDENT_SERVICE_URL}/student/{student_id}",
             timeout=5
         )
-        tutor_name = "Tutor"
-        if tutor_resp.status_code == 200:
-            tutor_name = tutor_resp.json().get("name", "Tutor")
+        if student_resp.status_code != 200:
+            return {"message": "Failed to retrieve student"}, 500
+
+        student_data = student_resp.json()
+        student_email = student_data.get("email", "")
 
         # 4. Calculate price server-side
         total_price = round(hourly_rate * (duration_mins / 60.0), 2)
@@ -102,6 +107,7 @@ class Checkout(Resource):
                 "session_id": session_id,
                 "student_id": student_id,
                 "tutor_id": tutor_id,
+                "student_email": student_email
             },
             timeout=10
         )
