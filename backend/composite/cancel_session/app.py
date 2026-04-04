@@ -2,8 +2,10 @@ from flask import Flask, request
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 import os
+import json
 import requests
 import jwt as pyjwt
+import pika
 from datetime import datetime, timezone, timedelta
 
 app = Flask(__name__)
@@ -20,7 +22,21 @@ TUTOR_SERVICE_URL    = os.environ.get("TUTOR_SERVICE_URL",    "http://localhost:
 STUDENT_SERVICE_URL  = os.environ.get("STUDENT_SERVICE_URL",  "http://localhost:5001")
 PAYMENT_SERVICE_URL  = os.environ.get("PAYMENT_SERVICE_URL",  "http://localhost:5007")
 CALENDAR_SERVICE_URL = os.environ.get("CALENDAR_SERVICE_URL", "http://localhost:5005")
-EMAIL_SERVICE_URL    = os.environ.get("EMAIL_SERVICE_URL",    "http://localhost:5006")
+RABBITMQ_HOST        = os.environ.get("RABBITMQ_HOST",        "localhost")
+
+
+def publish_email(routing_key, payload):
+    """Fire-and-forget publish to tuitiongo.email exchange."""
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+    channel = connection.channel()
+    channel.exchange_declare(exchange="tuitiongo.email", exchange_type="direct", durable=True)
+    channel.basic_publish(
+        exchange="tuitiongo.email",
+        routing_key=routing_key,
+        body=json.dumps(payload),
+        properties=pika.BasicProperties(delivery_mode=2)
+    )
+    connection.close()
 
 cancel_input_model = api.model('CancelInput', {
     'session_id': fields.String(required=True, description='The session UUID'),
@@ -263,39 +279,27 @@ class CancelSession(Resource):
             
             when_string = f"{fmt_date} ⋅ {fmt_start_time} – {fmt_end_time} (Singapore Standard Time)"
 
-            email_body = (
-                "This event has been canceled.\n\n"
-                "Tuition session cancelled via TuitionGo.\n\n"
-                "When\n"
-                f"{when_string}\n\n"
-                "Organizer\n"
-                f"{tutor_name}\n"
-                f"{tutor_email}"
-            )
+            email_details = {
+                "student_name": student_name,
+                "subject":      session.get("subject", "Tuition Session"),
+                "tutor_name":   tutor_name,
+                "tutor_email":  tutor_email,
+                "date":         when_string
+            }
 
             # 10a. Notify Student
-            requests.post(
-                f"{EMAIL_SERVICE_URL}/email/send",
-                json={
-                    "to_email": student_email,
-                    "subject":  "Canceled: Tuition Session",
-                    "body":     email_body,
-                    "use_template": False
-                },
-                timeout=5
-            )
+            publish_email("notification.email", {
+                "email":   student_email,
+                "type":    "CANCELLATION",
+                "details": email_details
+            })
 
             # 10b. Notify Tutor
-            requests.post(
-                f"{EMAIL_SERVICE_URL}/email/send",
-                json={
-                    "to_email": tutor_email,
-                    "subject":  "Canceled: Tuition Session",
-                    "body":     email_body,
-                    "use_template": False
-                },
-                timeout=5
-            )
+            publish_email("notification.email", {
+                "email":   tutor_email,
+                "type":    "CANCELLATION",
+                "details": email_details
+            })
             email_notified = True
         except Exception as e:
             print(f"Non-fatal error sending emails: {str(e)}")

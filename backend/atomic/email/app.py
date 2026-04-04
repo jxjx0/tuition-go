@@ -1,8 +1,9 @@
 import os
 import base64
 import json
-from flask import Flask, request
-from flask_restx import Api, Resource, fields
+import threading
+import pika
+from flask import Flask, jsonify
 from flask_cors import CORS
 from email.message import EmailMessage
 from google.auth.transport.requests import Request
@@ -12,11 +13,6 @@ from googleapiclient.discovery import build
 
 app = Flask(__name__)
 CORS(app)
-api = Api(app, doc="/docs",
-    title="Email Service",
-    version="1.0",
-    description="Email atomic service - REST API version"
-)
 
 # Gmail API scopes
 SCOPES = ['https://www.googleapis.com/auth/gmail.send']
@@ -25,6 +21,10 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.send']
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CREDENTIALS_PATH = os.path.join(BASE_DIR, "credentials.json")
 TOKEN_PATH = os.path.join(BASE_DIR, "token.json")
+
+# RabbitMQ configuration
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
+QUEUE_NAME = "email_queue"
 
 # Global Gmail service instance
 gmail_service = None
@@ -82,27 +82,19 @@ def send_email(recipient, subject, body, reply_to=None):
         print(f" [ERROR] Failed to send email: {error}")
         raise error
 
-# API Models
-email_payload = api.model('EmailRequest', {
-    'email': fields.String(required=True, description='Recipient email address'),
-    'type': fields.String(required=True, description='Type of email (BOOKING_SUCCESS, CANCELLATION, etc.)'),
-    'details': fields.Raw(description='Dynamic data for the email template'),
-    'reply_to': fields.String(description='Optional Reply-To email address')
-})
-
-@api.route("/send-email")
-class EmailSender(Resource):
-    @api.expect(email_payload)
-    def post(self):
-        """Directly send an email based on the payload provided."""
-        data = request.json
+def process_email_message(ch, method, properties, body):
+    """Processes a message from RabbitMQ."""
+    try:
+        data = json.loads(body)
         recipient = data.get("email")
         email_type = data.get("type")
         details = data.get("details", {})
         reply_to = data.get("reply_to")
 
         if not recipient or not email_type:
-            return {"error": "Missing email or type"}, 400
+            print(" [ERROR] Missing email or type in RabbitMQ message")
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
 
         # Define templates
         if email_type == "BOOKING_SUCCESS":
@@ -116,24 +108,57 @@ class EmailSender(Resource):
                 "Good luck with your session!"
             )
         elif email_type == "CANCELLATION":
-            subject = "Session Cancelled - TuitionGo"
-            content = f"Your session on {details.get('date')} for {details.get('subject')} has been cancelled."
+            subject = "Canceled: Tuition Session - TuitionGo"
+            content = (
+                "This event has been canceled.\n\n"
+                "Tuition session cancelled via TuitionGo.\n\n"
+                "When\n"
+                f"{details.get('date')}\n\n"
+                "Organizer\n"
+                f"{details.get('tutor_name')}\n"
+                f"{details.get('tutor_email')}"
+            )
         else:
             subject = "Notification - TuitionGo"
             content = "You have a new update regarding your session."
 
-        try:
-            send_email(recipient, subject, content, reply_to)
-            return {"message": "Email sent successfully"}, 200
-        except Exception as e:
-            return {"error": str(e)}, 500
+        send_email(recipient, subject, content, reply_to)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+        print(f" [OK] Processed email for: {recipient}")
+    except Exception as e:
+        print(f" [ERROR] Failed to process RabbitMQ message: {e}")
+        ch.basic_ack(delivery_tag=method.delivery_tag)
 
-@api.route("/health")
-class Health(Resource):
-    def get(self):
-        return {"status": "healthy", "service": "email", "gmail_connected": gmail_service is not None}, 200
+def start_rabbitmq_consumer():
+    """Starts the RabbitMQ consumer."""
+    try:
+        connection = pika.BlockingConnection(pika.ConnectionParameters(host=RABBITMQ_HOST))
+        channel = connection.channel()
+        channel.exchange_declare(exchange="tuitiongo.email", exchange_type="direct", durable=True)
+        channel.queue_declare(queue=QUEUE_NAME, durable=True)
+        channel.queue_bind(queue=QUEUE_NAME, exchange="tuitiongo.email", routing_key="notification.email")
+        channel.basic_consume(queue=QUEUE_NAME, on_message_callback=process_email_message)
+
+        print(f" [*] Waiting for messages in {QUEUE_NAME}. To exit press CTRL+C")
+        channel.start_consuming()
+    except Exception as e:
+        print(f" [ERROR] RabbitMQ connection failed: {e}")
+
+@app.route("/health", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "healthy", 
+        "service": "email-worker", 
+        "gmail_connected": gmail_service is not None
+    }), 200
 
 if __name__ == "__main__":
     # Initialize Gmail service once on startup
     init_gmail_service()
+    
+    # Start RabbitMQ consumer in a background thread
+    consumer_thread = threading.Thread(target=start_rabbitmq_consumer, daemon=True)
+    consumer_thread.start()
+    
+    # Run simple Flask server for health checks
     app.run(host="0.0.0.0", port=5006, debug=False)
