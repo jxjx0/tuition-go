@@ -94,14 +94,28 @@ def _format_email_when(session_start_utc, end_time_str):
 
 
 cancel_input_model = api.model('CancelInput', {
-    'session_id': fields.String(required=True, description='The session UUID'),
-    'student_id': fields.String(required=True, description='The student UUID'),
+    'session_id': fields.String(required=True, description='The session UUID', example='a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
+    'student_id': fields.String(required=True, description='The student UUID', example='b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'),
+})
+
+cancel_success_model = api.model('CancelSessionResponse', {
+    'message': fields.String(example='Session cancelled successfully'),
+    'session_id': fields.String(example='a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
+    'refund_status': fields.String(description='Stripe refund status or "skipped" if no payment was made', example='succeeded'),
+    'calendar_updated': fields.Boolean(example=True),
+    'email_notified': fields.Boolean(example=True),
+})
+
+cancel_error_model = api.model('CancelSessionError', {
+    'message': fields.String(description='Error message', example='You are not authorised to cancel this session'),
 })
 
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "cancel_session"}, 200
 
 
@@ -109,19 +123,32 @@ class Health(Resource):
 class CancelSession(Resource):
 
     @api.expect(cancel_input_model)
-    @api.response(200, 'Session cancelled successfully')
-    @api.response(400, 'Missing required fields')
-    @api.response(401, 'Unauthorised')
-    @api.response(403, 'Forbidden — not your session')
-    @api.response(422, 'Cancellation window has passed (< 2 hours)')
-    @api.response(500, 'Internal server error')
-    @api.response(502, 'Refund failed')
+    @api.response(200, 'Session cancelled successfully', cancel_success_model)
+    @api.response(400, 'Missing required fields', cancel_error_model)
+    @api.response(401, 'Invalid or missing Bearer JWT', cancel_error_model)
+    @api.response(403, 'Forbidden — not the student who booked this session', cancel_error_model)
+    @api.response(422, 'Cancellation window has passed — must cancel at least 2 hours before session', cancel_error_model)
+    @api.response(500, 'Internal server error', cancel_error_model)
+    @api.response(502, 'Stripe refund failed — session NOT cancelled', cancel_error_model)
     def post(self):
         """
-        Cancel a booked session.
-        Validates the 2-hour window, processes the Stripe refund, restores the
-        slot to 'available', removes the student from the Google Calendar event,
-        and notifies both parties via email.
+        Cancel a booked session. Requires student Bearer JWT.
+
+        **Business rules:**
+        - Student must be the one who booked the session
+        - Cancellation must be made at least **2 hours** before the session start time
+        - Full Stripe refund is processed before the slot is restored
+
+        **Flow:**
+        1. Extract student Clerk ID from JWT
+        2. Fetch and validate session (Session Service)
+        3. Verify student ownership
+        4. Validate 2-hour cancellation window
+        5. Fetch tutor and student details (Tutor + Student Services)
+        6. Process Stripe refund (Payment Service)
+        7. Restore session to `available`, clear studentId and stripeSessionId (Session Service)
+        8. Remove student from Google Calendar event (Calendar Service)
+        9. Send cancellation emails to both parties via RabbitMQ (Email Service)
         """
         data = request.get_json()
         session_id = data.get("session_id")

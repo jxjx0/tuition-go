@@ -53,21 +53,36 @@ enhanced_session_model = api.model('EnhancedSession', {
 })
 
 
+gs_error_model = api.model('GetSessionsError', {
+    'message': fields.String(description='Error message', example='No sessions found for student b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'),
+})
+
+
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "get_sessions"}, 200
 
 
 @api.route("/student/<string:studentId>/sessions")
 class StudentSessions(Resource):
 
+    @api.doc(params={'studentId': 'Student UUID'})
     @api.marshal_list_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved sessions')
-    @api.response(404, 'No sessions found for student')
-    @api.response(500, 'Internal server error')
+    @api.response(404, 'No sessions found for student', gs_error_model)
+    @api.response(500, 'Internal server error', gs_error_model)
     def get(self, studentId):
-        """Retrieve all sessions for a student with tutor details and pricing"""
+        """
+        Retrieve all sessions for a student, enriched with tutor name, subject, pricing.
+
+        **Flow:**
+        1. Fetch all sessions for the student (Session Service)
+        2. For each session: fetch tutor name, imageURL, subject name, academic level, and hourly rate (Tutor Service)
+        3. Calculate `totalPrice` from hourly rate × durationMins
+        """
         try:
             # 1. Get all sessions for the student
             auth_headers = _get_auth_headers()
@@ -107,12 +122,20 @@ class StudentSessions(Resource):
 @api.route("/tutor/<string:tutorId>/sessions")
 class TutorSessions(Resource):
 
+    @api.doc(params={'tutorId': 'Tutor UUID'})
     @api.marshal_list_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved sessions')
-    @api.response(404, 'No sessions found for tutor')
-    @api.response(500, 'Internal server error')
+    @api.response(404, 'No sessions found for tutor', gs_error_model)
+    @api.response(500, 'Internal server error', gs_error_model)
     def get(self, tutorId):
-        """Retrieve all sessions for a tutor with student details and pricing"""
+        """
+        Retrieve all sessions for a tutor, enriched with subject, pricing, and student details.
+
+        **Flow:**
+        1. Fetch all sessions for the tutor (Session Service)
+        2. For each session: fetch tutor subject/pricing (Tutor Service) and student name/avatar (Student Service)
+        3. Calculate `totalPrice` from hourly rate × durationMins
+        """
         try:
             # 1. Get all sessions for the tutor
             auth_headers = _get_auth_headers()
@@ -152,12 +175,20 @@ class TutorSessions(Resource):
 @api.route("/session/<string:sessionId>")
 class SessionDetail(Resource):
 
+    @api.doc(params={'sessionId': 'Session UUID'})
     @api.marshal_with(enhanced_session_model)
     @api.response(200, 'Successfully retrieved session')
-    @api.response(404, 'Session not found')
-    @api.response(500, 'Internal server error')
+    @api.response(404, 'Session not found', gs_error_model)
+    @api.response(500, 'Internal server error', gs_error_model)
     def get(self, sessionId):
-        """Retrieve a specific session by ID with tutor details and pricing"""
+        """
+        Retrieve a single session by ID, enriched with tutor, subject, pricing, student, and review.
+
+        **Flow:**
+        1. Fetch session by ID (Session Service)
+        2. Enrich with tutor/subject/pricing and student details (Tutor + Student Services)
+        3. Fetch the review for this specific session, if any (OutSystems Review API)
+        """
         try:
             # 1. Get the specific session
             auth_headers = _get_auth_headers()

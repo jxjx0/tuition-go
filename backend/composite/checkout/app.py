@@ -19,22 +19,47 @@ PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://localhost:50
 STUDENT_SERVICE_URL = os.environ.get("STUDENT_SERVICE_URL", "http://localhost:5001")
 
 checkout_input = api.model('CheckoutInput', {
-    'session_id': fields.String(required=True, description='The session UUID to book'),
-    'student_id': fields.String(required=True, description='The student UUID who is booking')
+    'session_id': fields.String(required=True, description='The session UUID to book', example='a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
+    'student_id': fields.String(required=True, description='The student UUID who is booking', example='b5eebc99-9c0b-4ef8-bb6d-6bb9bd380a22'),
+})
+
+checkout_response = api.model('CheckoutResponse', {
+    'url': fields.String(description='Stripe checkout URL to redirect the student to', example='https://checkout.stripe.com/pay/cs_test_abc123'),
+})
+
+error_model = api.model('CheckoutError', {
+    'message': fields.String(description='Error message', example='Session not found'),
 })
 
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "checkout"}, 200
 
 
 @api.route("/checkout")
 class Checkout(Resource):
     @api.expect(checkout_input)
+    @api.response(200, 'Stripe checkout URL returned', checkout_response)
+    @api.response(400, 'Missing session_id or student_id', error_model)
+    @api.response(404, 'Session or tutor subject not found', error_model)
+    @api.response(500, 'Downstream service error', error_model)
     def post(self):
-        """Create a Stripe checkout session for booking a tuition session."""
+        """
+        Orchestrate a Stripe Checkout session for booking a tuition slot.
+
+        **Flow:**
+        1. Fetch session details (Session Service)
+        2. Fetch tutor name and hourly rate (Tutor Service)
+        3. Fetch student email (Student Service)
+        4. Calculate total price server-side
+        5. Create Stripe checkout session (Payment Service)
+
+        Returns a Stripe redirect URL.
+        """
         data = request.get_json()
         session_id = data.get("session_id")
         student_id = data.get("student_id")

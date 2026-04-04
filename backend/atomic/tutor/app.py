@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timezone
 from flask import Flask, jsonify, request
-from flask_restx import Api, Resource
+from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from supabase import create_client, Client
@@ -30,11 +30,64 @@ api = Api(app, doc="/docs",
     prefix="/tutor"
 )
 
+tutor_subject_model = api.model('TutorSubject', {
+    'tutorSubjectId': fields.String(description='Tutor subject UUID', example='d2eebc99-9c0b-4ef8-bb6d-6bb9bd380a44'),
+    'subject': fields.String(description='Subject name', example='Mathematics'),
+    'academicLevel': fields.String(description='Academic level', example='Primary 5'),
+    'hourlyRate': fields.Float(description='Hourly rate in SGD', example=80.0),
+})
+
+tutor_model = api.model('TutorResponse', {
+    'tutorId': fields.String(description='Tutor UUID', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
+    'clerkUserId': fields.String(description='Clerk user ID', example='user_2abc123def456'),
+    'name': fields.String(description='Full name', example='Mr John Lim'),
+    'email': fields.String(description='Gmail address', example='john@gmail.com'),
+    'phone': fields.String(description='Phone number', example='+6598765432'),
+    'bio': fields.String(description='Tutor bio', example='10 years experience teaching A-Level Mathematics.'),
+    'imageURL': fields.String(description='Profile image URL', example='https://storage.example.com/john.jpg'),
+    'averageRating': fields.Float(description='Average rating (0–5)', example=4.8),
+    'totalReviews': fields.Integer(description='Total number of reviews', example=23),
+    'subjects': fields.List(fields.Nested(tutor_subject_model), description='Subjects taught'),
+})
+
+tutor_register_input = api.model('TutorRegisterInput', {
+    'name': fields.String(description='Full name (auto-derived from email if omitted)', example='Mr John Lim'),
+    'email': fields.String(required=True, description='Gmail address (must be @gmail.com)', example='john@gmail.com'),
+    'phone': fields.String(description='Phone number (optional)', example='+6598765432'),
+    'password': fields.String(description='Password (optional, will be hashed)', example='secret123'),
+    'clerkUserId': fields.String(required=True, description='Clerk user ID', example='user_2abc123def456'),
+})
+
+update_rating_input = api.model('UpdateRatingInput', {
+    'tutorId': fields.String(required=True, description='Tutor UUID', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
+    'averageRating': fields.Float(required=True, description='New average rating (0–5)', example=4.8),
+    'totalReviews': fields.Integer(required=True, description='New total review count', example=23),
+})
+
+add_subject_input = api.model('AddSubjectInput', {
+    'subject': fields.String(required=True, description='Subject name', example='Mathematics'),
+    'academicLevel': fields.String(required=True, description='Academic level', example='Primary 5'),
+    'hourlyRate': fields.Float(required=True, description='Hourly rate in SGD (must be > 0)', example=80.0),
+})
+
+update_subject_input = api.model('UpdateSubjectInput', {
+    'subject': fields.String(description='Subject name', example='Physics'),
+    'academicLevel': fields.String(description='Academic level', example='O-Level'),
+    'hourlyRate': fields.Float(description='Hourly rate in SGD', example=70.0),
+})
+
+tutor_error_model = api.model('TutorError', {
+    'error': fields.String(description='Error message', example='Tutor not found'),
+})
+
 
 #GET all tutors
 @api.route("/all")
 class Tutors(Resource):
+    @api.marshal_list_with(tutor_model)
+    @api.response(200, 'List of all tutors')
     def get(self):
+        """Retrieve all tutors ordered by creation date (newest first)."""
         tutors = supabase.table("Tutor") .select("*").order("createdAt", desc=True).execute()
 
         return tutors.data, 200
@@ -46,7 +99,17 @@ class Tutors(Resource):
 # GET /tutors/search?name=vincent
 @api.route("/search")
 class SearchTutors(Resource):
+    @api.doc(params={
+        'subject': 'Filter by subject name (e.g. Mathematics)',
+        'academicLevel': 'Filter by academic level (e.g. A-Level)',
+        'name': 'Search by tutor name (partial match)',
+        'sort': 'Sort order: highestRated | mostReviews',
+    })
+    @api.marshal_list_with(tutor_model)
+    @api.response(200, 'Filtered and sorted list of tutors')
+    @api.response(500, 'Internal server error', tutor_error_model)
     def get(self):
+        """Search and filter tutors by subject, academic level, name, and/or sort order."""
 
         subject = request.args.get("subject")
         academic_level = request.args.get("academicLevel")
@@ -200,10 +263,16 @@ class SearchTutors(Resource):
 #         except Exception as e:
 #             return {"error": str(e)}, 500
 
-#GET particular tutor with id
+#GET, PUT, DELETE for a specific tutor by ID
 @api.route("/<string:tutorID>")
-class GetTutorById(Resource):
+class TutorById(Resource):
+    @api.doc(params={'tutorID': 'Tutor UUID'})
+    @api.marshal_with(tutor_model)
+    @api.response(200, 'Tutor found', tutor_model)
+    @api.response(404, 'Tutor not found', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
     def get(self, tutorID):
+        """Retrieve a tutor by ID, including their subjects and hourly rates."""
         try:
             response = (
                 supabase.table("Tutor")
@@ -237,92 +306,23 @@ class GetTutorById(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-
-#POST register/create tutor
-@api.route("/register")
-class TutorRegister(Resource):
-    def post(self):
-        data = request.get_json()
-
-        if not data:
-            return {"error": "No input data provided"}, 400
-
-        name = data.get("name")
-        email = data.get("email")
-        phone = data.get("phone")
-        password = data.get("password")
-        clerk_user_id = data.get("clerkUserId")
-
-        # If name is missing, generate it from email
-        if not name and email:
-            name = email.split("@")[0]
-
-        if not name or not email or not clerk_user_id:
-            return {"error": "name, email, and clerkUserId are required"}, 400
-
-        
-        #ensure the email is gmail
-        email_regex = r'^[a-zA-Z0-9._%+-]+@gmail\.com$'
-
-        if not re.match(email_regex, email):
-            return {"error": "Email must be a valid Gmail address"}, 400
-
-        #Check if email already exists
-        existing = (
-            supabase
-            .table("Tutor")
-            .select("tutorId")
-            .eq("email", email)
-            .execute()
+    @api.doc(
+        params={'tutorID': 'Tutor UUID'},
+        description=(
+            'Update tutor profile. Send as **multipart/form-data**. '
+            'Fields: `name` (string, optional), `phone` (string, optional), '
+            '`bio` (string, optional), `password` (string, optional), '
+            '`profileImage` (file, optional — JPEG/PNG).'
         )
-
-        if existing.data and len(existing.data) > 0:
-            return {"error": "Email already exists"}, 400
-        
-        # Check if a student with this clerkUserId already exists
-        existing2 = (
-            supabase
-            .table("Tutor")
-            .select("tutorId")
-            .eq("clerkUserId", clerk_user_id)
-            .execute()
-        )
-        
-        # Set in clerk unsafemetadata the tutorId to be inside it 
-        if existing2.data and len(existing2.data) > 0:
-            return existing2.data[0], 200
-
-        #Hash password if provided
-        password_hash = None
-        if password:
-            password_hash = generate_password_hash(password)
-
-        #Format data exactly matching DB column names
-        tutor_data = {
-            "name": name,
-            "email": email,
-            "phone": phone,
-            "passwordHash": password_hash,
-            "clerkUserId": clerk_user_id
-        }
-
-        # Remove None values (optional clean-up)
-        tutor_data = {k: v for k, v in tutor_data.items() if v is not None}
-
-        try:
-            response = supabase.table("Tutor").insert(tutor_data).execute()
-            return response.data, 201
-
-        except Exception as e:
-            return {"error": str(e)}, 500
-
-
-#PUT update tutor info
-#Accept file from frontend (multipart/form-data)
-@api.route("/<string:tutorID>")
-class UpdateTutor(Resource):
-
+    )
+    @api.response(200, 'Tutor updated successfully', api.model('TutorUpdateResponse', {
+        'message': fields.String(example='Tutor updated successfully'),
+        'data': fields.Raw(description='Updated tutor record'),
+    }))
+    @api.response(400, 'No valid fields to update', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
     def put(self, tutorID):
+        """Update tutor profile (name, phone, bio, password, profile image). Multipart/form-data."""
 
         form = request.form
         file = request.files.get("profileImage")
@@ -370,7 +370,7 @@ class UpdateTutor(Resource):
 
             if not update_data:
                 return {"error": "No valid fields to update"}, 400
-            
+
             # Update timestamp (UTC)
             update_data["updatedAt"] = datetime.now(timezone.utc).isoformat()
 
@@ -390,12 +390,14 @@ class UpdateTutor(Resource):
         except Exception as e:
             return {"error": str(e)}, 500
 
-
-#DELETE delete tutor user
-@api.route("/<string:tutorID>")
-class DeleteTutor(Resource):
-
+    @api.doc(params={'tutorID': 'Tutor UUID'})
+    @api.response(200, 'Tutor deleted successfully', api.model('TutorDeleteResponse', {
+        'message': fields.String(example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33 deleted successfully'),
+    }))
+    @api.response(404, 'Tutor not found', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
     def delete(self, tutorID):
+        """Delete a tutor account by tutorId."""
         try:
             response = (
                 supabase.table("Tutor").delete().eq("tutorId", tutorID).execute()
@@ -410,11 +412,106 @@ class DeleteTutor(Resource):
             return {"error": str(e)}, 500
 
 
+#POST register/create tutor
+@api.route("/register")
+class TutorRegister(Resource):
+    @api.expect(tutor_register_input)
+    @api.response(201, 'Tutor created', tutor_model)
+    @api.response(200, 'Tutor already exists (idempotent)', tutor_model)
+    @api.response(400, 'Missing required fields or email not Gmail', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
+    def post(self):
+        """Register a new tutor. Email must be @gmail.com. Idempotent — returns existing record if clerkUserId already exists."""
+        data = request.get_json()
+
+        if not data:
+            return {"error": "No input data provided"}, 400
+
+        name = data.get("name")
+        email = data.get("email")
+        phone = data.get("phone")
+        password = data.get("password")
+        clerk_user_id = data.get("clerkUserId")
+
+        # If name is missing, generate it from email
+        if not name and email:
+            name = email.split("@")[0]
+
+        if not name or not email or not clerk_user_id:
+            return {"error": "name, email, and clerkUserId are required"}, 400
+
+        #ensure the email is gmail
+        email_regex = r'^[a-zA-Z0-9._%+-]+@gmail\.com$'
+
+        if not re.match(email_regex, email):
+            return {"error": "Email must be a valid Gmail address"}, 400
+
+        #Check if email already exists
+        existing = (
+            supabase
+            .table("Tutor")
+            .select("tutorId")
+            .eq("email", email)
+            .execute()
+        )
+
+        if existing.data and len(existing.data) > 0:
+            return {"error": "Email already exists"}, 400
+
+        # Check if a tutor with this clerkUserId already exists
+        existing2 = (
+            supabase
+            .table("Tutor")
+            .select("tutorId")
+            .eq("clerkUserId", clerk_user_id)
+            .execute()
+        )
+
+        # Set in clerk unsafemetadata the tutorId to be inside it
+        if existing2.data and len(existing2.data) > 0:
+            return existing2.data[0], 200
+
+        #Hash password if provided
+        password_hash = None
+        if password:
+            password_hash = generate_password_hash(password)
+
+        #Format data exactly matching DB column names
+        tutor_data = {
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "passwordHash": password_hash,
+            "clerkUserId": clerk_user_id
+        }
+
+        # Remove None values (optional clean-up)
+        tutor_data = {k: v for k, v in tutor_data.items() if v is not None}
+
+        try:
+            response = supabase.table("Tutor").insert(tutor_data).execute()
+            return response.data, 201
+
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+
 #PUT update reviews portion of tutor (averageRating and totalReviews)
 @api.route("/updateRating")
 class UpdateTutorRating(Resource):
 
+    @api.expect(update_rating_input)
+    @api.response(200, 'Tutor rating updated', api.model('UpdateRatingResponse', {
+        'tutorId': fields.String(example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
+        'name': fields.String(example='Mr John Lim'),
+        'averageRating': fields.Float(example=4.8),
+        'totalReviews': fields.Integer(example=23),
+    }))
+    @api.response(400, 'Missing/invalid fields', tutor_error_model)
+    @api.response(404, 'Tutor not found', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
     def put(self):
+        """Sync averageRating and totalReviews to the Tutor table. Called internally by Rate Tutor service."""
         data = request.get_json()
 
         if not data:
@@ -479,12 +576,25 @@ class UpdateTutorRating(Resource):
             return {"error": str(e)}, 500
 
 
-#POST create new subject that the tutor teaches
+#GET and POST subjects for a tutor
 @api.route("/<string:tutorId>/subjects")
-class TutorAddSubject(Resource):
+class TutorSubjectsList(Resource):
 
-
+    @api.doc(params={'tutorId': 'Tutor UUID'})
+    @api.expect(add_subject_input)
+    @api.response(201, 'Subject added successfully', api.model('AddSubjectResponse', {
+        'message': fields.String(example='Subject added successfully'),
+        'data': fields.List(fields.Nested(tutor_subject_model)),
+    }))
+    @api.response(200, 'Hourly rate updated (same subject+level already exists)', api.model('UpdateSubjectRateResponse', {
+        'message': fields.String(example='Hourly rate updated successfully.'),
+        'data': fields.List(fields.Nested(tutor_subject_model)),
+    }))
+    @api.response(400, 'Missing fields or hourly rate not positive', tutor_error_model)
+    @api.response(409, 'Exact duplicate subject already exists', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
     def post(self, tutorId):
+        """Add a subject for a tutor. If the same subject+level exists with a different rate, the rate is updated instead."""
         data = request.get_json()
 
         if not data:
@@ -558,10 +668,12 @@ class TutorAddSubject(Resource):
             return {"error": str(e)}, 500
 
 
-#GET get subjects tutor is teaching
-@api.route("/<string:tutorId>/subjects")
-class TutorSubjects(Resource):
+    @api.doc(params={'tutorId': 'Tutor UUID'})
+    @api.marshal_list_with(tutor_subject_model)
+    @api.response(200, 'List of subjects for this tutor')
+    @api.response(500, 'Internal server error', tutor_error_model)
     def get(self, tutorId):
+        """Retrieve all subjects taught by a tutor, ordered by creation date."""
         try:
             response = (supabase.table("TutorSubjects").select("*").eq("tutorId", tutorId).order("createdAt", desc=True).execute())
 
@@ -571,12 +683,18 @@ class TutorSubjects(Resource):
             return {"error": str(e)}, 500
 
 
-#PUT update subject that the tutor teaches
+#PUT and DELETE a specific subject
 @api.route("/<string:tutorId>/subjects/<string:subjectId>")
-class UpdateTutorSubject(Resource):
+class TutorSubjectById(Resource):
 
-
+    @api.doc(params={'tutorId': 'Tutor UUID', 'subjectId': 'Tutor subject UUID'})
+    @api.expect(update_subject_input)
+    @api.response(200, 'Subject updated', tutor_subject_model)
+    @api.response(400, 'No valid fields provided', tutor_error_model)
+    @api.response(404, 'Subject not found', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
     def put(self, tutorId, subjectId):
+        """Update a subject's name, academic level, or hourly rate."""
         data = request.get_json()
 
         if not data:
@@ -607,11 +725,14 @@ class UpdateTutorSubject(Resource):
             return {"error": str(e)}, 500
 
 
-#DELETE delete subject that the tutor taught
-@api.route("/<string:tutorId>/subjects/<string:subjectId>")
-class DeleteTutorSubject(Resource):
-
+    @api.doc(params={'tutorId': 'Tutor UUID', 'subjectId': 'Tutor subject UUID'})
+    @api.response(200, 'Subject deleted', api.model('DeleteSubjectResponse', {
+        'message': fields.String(example='Subject deleted successfully'),
+    }))
+    @api.response(404, 'Subject not found', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
     def delete(self, tutorId, subjectId):
+        """Delete a subject that a tutor teaches."""
         try:
             response = (supabase.table("TutorSubjects").delete().eq("tutorSubjectId", subjectId).eq("tutorId", tutorId).execute())
 
@@ -626,7 +747,9 @@ class DeleteTutorSubject(Resource):
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "tutor"}, 200
 
 
