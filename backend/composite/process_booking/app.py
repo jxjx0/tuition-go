@@ -246,7 +246,7 @@ class ProcessBooking(Resource):
             publish_email("notification.email", {"email": student_email, "type": "BOOKING_SUCCESS", "details": email_details})
             print(f"[EMAIL] Published to student: {student_email}")
 
-            publish_email("notification.email", {"email": tutor_email, "type": "BOOKING_SUCCESS", "details": email_details})
+            publish_email("notification.email", {"email": tutor_email, "type": "BOOKING_TUTOR", "details": email_details})
             print(f"[EMAIL] Published to tutor: {tutor_email}")
 
             email_notified = True

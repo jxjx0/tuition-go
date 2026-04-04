@@ -107,16 +107,32 @@ def process_email_message(ch, method, properties, body):
                 f"Meeting Link: {details.get('meeting_link')}\n\n"
                 "Good luck with your session!"
             )
-        elif email_type == "CANCELLATION":
-            subject = "Canceled: Tuition Session - TuitionGo"
+        elif email_type == "BOOKING_TUTOR":
+            subject = "New Booking Received - TuitionGo"
             content = (
-                "This event has been canceled.\n\n"
-                "Tuition session cancelled via TuitionGo.\n\n"
-                "When\n"
-                f"{details.get('date')}\n\n"
-                "Organizer\n"
-                f"{details.get('tutor_name')}\n"
-                f"{details.get('tutor_email')}"
+                f"Hi {details.get('tutor_name', 'Tutor')}!\n\n"
+                f"You have a new booking from {details.get('student_name')} for {details.get('subject')}.\n"
+                f"Date: {details.get('date')}\n"
+                f"Time: {details.get('time')}\n"
+                f"Meeting Link: {details.get('meeting_link')}\n\n"
+                "Please be ready for the session!"
+            )
+        elif email_type == "CANCELLATION_STUDENT":
+            subject = "Session Cancelled - TuitionGo"
+            content = (
+                f"Hi {details.get('student_name', 'Student')}!\n\n"
+                f"Your session for {details.get('subject')} with {details.get('tutor_name')} has been cancelled.\n\n"
+                f"When: {details.get('date')}\n\n"
+                "If you paid for this session, your refund will be processed shortly.\n\n"
+                "We hope to see you book again soon!"
+            )
+        elif email_type == "CANCELLATION_TUTOR":
+            subject = "Booking Cancelled - TuitionGo"
+            content = (
+                f"Hi {details.get('tutor_name', 'Tutor')}!\n\n"
+                f"{details.get('student_name')} has cancelled their booking for {details.get('subject')}.\n\n"
+                f"When: {details.get('date')}\n\n"
+                "The slot has been restored and is available for new bookings."
             )
         else:
             subject = "Notification - TuitionGo"
