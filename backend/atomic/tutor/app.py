@@ -410,9 +410,7 @@ class DeleteTutor(Resource):
             return {"error": str(e)}, 500
 
 
-#PUT update reviews portion of tutor
-# get the new review from the student & calculate what is the new no. of review and average rating
-# if the review is being updated, then calculate by ((averageRating * totalReviews) - old rating + new rating) / totalReviews
+#PUT update reviews portion of tutor (averageRating and totalReviews)
 @api.route("/updateRating")
 class UpdateTutorRating(Resource):
 
@@ -423,25 +421,28 @@ class UpdateTutorRating(Resource):
             return {"error": "No input data provided"}, 400
 
         tutor_id = data.get("tutorId")
-        new_rating = data.get("newRating")
-        old_rating = data.get("oldRating")  # optional
+        average_rating = data.get("averageRating")
+        total_reviews = data.get("totalReviews")
 
-        if not tutor_id or new_rating is None:
-            return {"error": "tutorId and newRating are required"}, 400
+        if not tutor_id or average_rating is None or total_reviews is None:
+            return {
+                "error": "tutorId, averageRating and totalReviews are required"
+            }, 400
 
-        # Validate ratings
-        if not isinstance(new_rating, (int, float)) or not (1 <= new_rating <= 5):
-            return {"error": "newRating must be between 1 and 5"}, 400
+        # Validate rating
+        if not isinstance(average_rating, (int, float)) or not (0 <= average_rating <= 5):
+            return {"error": "averageRating must be between 0 and 5"}, 400
 
-        if old_rating is not None:
-            if not isinstance(old_rating, (int, float)) or not (1 <= old_rating <= 5):
-                return {"error": "oldRating must be between 1 and 5"}, 400
+        # Validate totalReviews
+        if not isinstance(total_reviews, int) or total_reviews < 0:
+            return {"error": "totalReviews must be a positive integer"}, 400
 
         try:
-            # Get current tutor data
+
+            # Check tutor exists
             response_tutor = (
                 supabase.table("Tutor")
-                .select("name, averageRating, totalReviews")
+                .select("name")
                 .eq("tutorId", tutor_id)
                 .single()
                 .execute()
@@ -450,22 +451,7 @@ class UpdateTutorRating(Resource):
             if not response_tutor.data:
                 return {"error": "Tutor not found"}, 404
 
-            current_avg = response_tutor.data["averageRating"]
-            current_total = response_tutor.data["totalReviews"]
             tutor_name = response_tutor.data["name"]
-
-            # Scenario 1: New Review
-            if old_rating is None:
-                new_total = current_total + 1
-                new_average = ((current_avg * current_total) + new_rating) / new_total
-
-            # Scenario 2: Update Existing Review
-            else:
-                new_total = current_total  # total reviews unchanged
-                new_average = ((current_avg * current_total) - old_rating + new_rating) / current_total
-
-            # Round to 1 decimal
-            new_average = round(new_average, 1)
 
             # Update timestamp
             updated_time = datetime.now(timezone.utc).isoformat()
@@ -474,8 +460,8 @@ class UpdateTutorRating(Resource):
             update_response = (
                 supabase.table("Tutor")
                 .update({
-                    "averageRating": new_average,
-                    "totalReviews": new_total,
+                    "averageRating": average_rating,
+                    "totalReviews": total_reviews,
                     "updatedAt": updated_time
                 })
                 .eq("tutorId", tutor_id)
@@ -485,8 +471,8 @@ class UpdateTutorRating(Resource):
             return {
                 "tutorId": tutor_id,
                 "name": tutor_name,
-                "newAverageRating": new_average,
-                "totalReviews": new_total
+                "averageRating": average_rating,
+                "totalReviews": total_reviews
             }, 200
 
         except Exception as e:
