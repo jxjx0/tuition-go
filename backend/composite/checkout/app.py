@@ -16,6 +16,7 @@ api = Api(app, doc="/docs",
 SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:5003")
 TUTOR_SERVICE_URL = os.environ.get("TUTOR_SERVICE_URL", "http://localhost:5002")
 PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://localhost:5007")
+STUDENT_SERVICE_URL = os.environ.get("STUDENT_SERVICE_URL", "http://localhost:5001")
 
 checkout_input = api.model('CheckoutInput', {
     'session_id': fields.String(required=True, description='The session UUID to book'),
@@ -78,6 +79,17 @@ class Checkout(Resource):
         subject_name = matching.get("subject", "Tuition")
         academic_level = matching.get("academicLevel", "")
 
+        # 3. Fetch student to get email
+        student_resp = requests.get(
+            f"{STUDENT_SERVICE_URL}/student/{student_id}",
+            timeout=5
+        )
+        if student_resp.status_code != 200:
+            return {"message": "Failed to retrieve student"}, 500
+
+        student_data = student_resp.json()
+        student_email = student_data.get("email", "")
+
         # 4. Calculate price server-side
         total_price = round(hourly_rate * (duration_mins / 60.0), 2)
         amount_cents = int(total_price * 100)
@@ -95,6 +107,7 @@ class Checkout(Resource):
                 "session_id": session_id,
                 "student_id": student_id,
                 "tutor_id": tutor_id,
+                "student_email": student_email
             },
             timeout=10
         )

@@ -201,6 +201,72 @@ class ProcessBooking(Resource):
             "status": "booked"
         }, 200
 
+@api.route("/booking-details/<string:stripe_session_id>")
+class BookingDetails(Resource):
+    def get(self, stripe_session_id):
+        """Fetch session details for payment failed/success page using Stripe session ID."""
 
+        auth_header = request.headers.get("Authorization", "")  # ✅ Extract from request
+
+        # 1. Retrieve Stripe session to get metadata
+        payment_resp = requests.get(
+            f"{PAYMENT_SERVICE_URL}/payment/stripe-session/{stripe_session_id}",
+            headers={"Authorization": auth_header},  # ✅
+            timeout=10
+        )
+        if payment_resp.status_code != 200:
+            return {"message": "Failed to retrieve Stripe session"}, 404
+
+        payment_data = payment_resp.json()
+        session_id = payment_data.get("session_id")
+        student_id = payment_data.get("student_id")
+
+        if not session_id:
+            return {"message": "No session found for this Stripe session"}, 404
+
+        # 2. Fetch session details
+        session_resp = requests.get(
+            f"{SESSION_SERVICE_URL}/session/{session_id}",
+            headers={"Authorization": auth_header},  # ✅
+            timeout=5
+        )
+        if session_resp.status_code != 200:
+            return {"message": "Failed to retrieve session"}, 500
+
+        session = session_resp.json()
+        tutor_id = session.get("tutorId")
+        tutor_subject_id = session.get("tutorSubjectId")
+
+        # 3. Fetch tutor details + subject name
+        tutor_resp = requests.get(
+            f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}",
+            headers={"Authorization": auth_header},  # ✅
+            timeout=5
+        )
+        if tutor_resp.status_code != 200:
+            return {"message": "Failed to retrieve tutor details"}, 500
+
+        tutor_data = tutor_resp.json()
+        tutor_name = tutor_data.get("name", "Tutor")
+
+        subject_name = "Tutoring Session"
+        matching = next(
+            (s for s in tutor_data.get("subjects", []) if s.get("tutorSubjectId") == tutor_subject_id),
+            None
+        )
+        if matching:
+            subject_name = matching.get("subject", "Tutoring Session")
+
+        return {
+            "sessionId": session_id,
+            "studentId": student_id,
+            "tutor_name": tutor_name,
+            "subject": subject_name,
+            "amount_paid": payment_data.get("amount_total", 0),
+            "start_time": session.get("startTime"),
+            "end_time": session.get("endTime"),
+            "status": session.get("status"),
+        }, 200
+        
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5104, debug=True)

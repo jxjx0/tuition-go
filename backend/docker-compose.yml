@@ -161,6 +161,7 @@ services:
       - SESSION_SERVICE_URL=http://session:5003
       - TUTOR_SERVICE_URL=http://tutor:5002
       - PAYMENT_SERVICE_URL=http://payment:5007
+      - STUDENT_SERVICE_URL=http://student-service:5001
     networks:
       - tuition-network
     restart: unless-stopped
