@@ -38,6 +38,57 @@ def publish_email(routing_key, payload):
     )
     connection.close()
 
+
+def _extract_clerk_id(auth_header):
+    """Decode JWT and return the 'sub' claim (Clerk user ID), or raise ValueError."""
+    token = auth_header.replace("Bearer ", "")
+    try:
+        claims = pyjwt.decode(token, options={"verify_signature": False})
+    except Exception:
+        raise ValueError("Invalid authorization token")
+    clerk_id = claims.get("sub")
+    if not clerk_id:
+        raise ValueError("Could not identify student from token")
+    return clerk_id
+
+
+def _parse_session_start_utc(start_time_str):
+    """
+    Parse a Supabase startTime string into an absolute UTC datetime.
+
+    Supabase stores SGT times as fixed UTC offsets (e.g. 18:00+00 meaning
+    18:00 SGT, not 18:00 UTC). We subtract 8 hours to get the real UTC instant.
+    """
+    clean = start_time_str.replace(" ", "T")
+    if clean.endswith("Z"):
+        clean = clean.replace("Z", "+00:00")
+    dt = datetime.fromisoformat(clean)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+    # DB stores SGT wall-clock as a UTC number — subtract 8 h for real UTC
+    return dt - timedelta(hours=8)
+
+
+def _format_email_when(session_start_utc, end_time_str):
+    """
+    Return a human-readable session time string in SGT, e.g.
+    "Thursday 02 Apr 2026 ⋅ 6pm – 7pm (Singapore Standard Time)"
+    """
+    display_start = session_start_utc + timedelta(hours=8)
+    try:
+        base_end = datetime.fromisoformat(end_time_str.replace(" ", "T").replace("Z", "+00:00"))
+        display_end = base_end.astimezone(timezone.utc) + timedelta(hours=8)
+    except Exception:
+        display_end = display_start + timedelta(hours=1)
+
+    fmt_date       = display_start.strftime("%A %d %b %Y")
+    fmt_start_time = display_start.strftime("%I%p").lower().lstrip("0") or "12am"
+    fmt_end_time   = display_end.strftime("%I%p").lower().lstrip("0") or "12am"
+    return f"{fmt_date} ⋅ {fmt_start_time} – {fmt_end_time} (Singapore Standard Time)"
+
+
 cancel_input_model = api.model('CancelInput', {
     'session_id': fields.String(required=True, description='The session UUID'),
     'student_id': fields.String(required=True, description='The student UUID'),
@@ -64,9 +115,9 @@ class CancelSession(Resource):
     def post(self):
         """
         Cancel a booked session.
-        Validates the 2-hour window, marks the session cancelled,
-        processes the Stripe refund, restores the slot to 'available',
-        removes the student from the Google Calendar event, and notifies both via email.
+        Validates the 2-hour window, processes the Stripe refund, restores the
+        slot to 'available', removes the student from the Google Calendar event,
+        and notifies both parties via email.
         """
         data = request.get_json()
         session_id = data.get("session_id")
@@ -78,17 +129,12 @@ class CancelSession(Resource):
         auth_header = request.headers.get("Authorization", "")
 
         # ── Step 1: Extract student Clerk ID from JWT ──────────────────────────
-        token = auth_header.replace("Bearer ", "")
         try:
-            claims = pyjwt.decode(token, options={"verify_signature": False})
-            student_clerk_id = claims.get("sub")
-        except Exception:
-            return {"message": "Invalid authorization token"}, 401
+            student_clerk_id = _extract_clerk_id(auth_header)
+        except ValueError as e:
+            return {"message": str(e)}, 401
 
-        if not student_clerk_id:
-            return {"message": "Could not identify student from token"}, 401
-
-        # ── Step 2: Fetch session from Session Service ─────────────────────────
+        # ── Step 2: Fetch session (SESSION ATOMIC SERVICE)
         session_resp = requests.get(
             f"{SESSION_SERVICE_URL}/session/{session_id}",
             headers={"Authorization": auth_header},
@@ -104,82 +150,42 @@ class CancelSession(Resource):
             return {"message": "You are not authorised to cancel this session"}, 403
 
         # ── Step 4: Validate 2-hour cancellation window ────────────────────────
-        start_time_str = session.get("startTime", "")
         try:
-            # Step 4a: Normalize the input string to ISO format and ensure it's TZ-aware
-            # Supabase strings can be "2026-04-01 10:00:00+00" or "2026-04-01T10:00:00Z"
-            clean_time = start_time_str.replace(" ", "T")
-            
-            # Handle 'Z' suffix by translating to +00:00 for fromisoformat
-            if clean_time.endswith("Z"):
-                clean_time = clean_time.replace("Z", "+00:00")
-            
-            # If the string is naive (no + or Z), we assume UTC standard
-            dt_parsed = datetime.fromisoformat(clean_time)
-            if dt_parsed.tzinfo is None:
-                dt_sgt_basis = dt_parsed.replace(tzinfo=timezone.utc)
-            else:
-                dt_sgt_basis = dt_parsed.astimezone(timezone.utc)
-            
-            # FINAL ALIGNMENT: 
-            # The DB stores SGT time (e.g. 18:00) as a fixed UTC number (18:00Z).
-            # SGT 18:00 is actually 10:00 UTC. To get the real absolute UTC, we subtract 8 hours.
-            session_start_utc = dt_sgt_basis - timedelta(hours=8)
-            
-            # Current time in UTC
+            session_start_utc = _parse_session_start_utc(session.get("startTime", ""))
             now_utc = datetime.now(timezone.utc)
-            
-            # Calculation
-            time_diff = session_start_utc - now_utc
-            hours_until = time_diff.total_seconds() / 3600
-            
-            # Detailed Logging for debugging
-            print(f"--- SGT-AWARE CANCELLATION CHECK ---")
-            print(f"Raw startTime from DB:     {start_time_str}")
-            print(f"Interpreted SGT Time:      {dt_sgt_basis.isoformat()}")
-            print(f"Absolute UTC Start Time:   {session_start_utc.isoformat()}")
-            print(f"Absolute UTC Now:          {now_utc.isoformat()}")
-            print(f"Real Hours until session:  {hours_until:.2f}")
-            print(f"------------------------------------")
+            hours_until = (session_start_utc - now_utc).total_seconds() / 3600
 
-            # Cancellation window check
             if hours_until < 2:
-                # If hours_until is negative, the session has already passed
+                time_diff = session_start_utc - now_utc
                 total_seconds = max(0, int(time_diff.total_seconds()))
-                h = total_seconds // 3600
-                m = (total_seconds % 3600) // 60
-                
+                h, m = total_seconds // 3600, (total_seconds % 3600) // 60
                 time_str = f"{h} hour(s) and {m} minute(s)" if h > 0 else f"{m} minute(s)"
-                msg = (f"Cancellation must be made at least 2 hours before the session. "
-                       f"Session starts in {time_str}.")
                 return {
-                    "message": msg,
+                    "message": (
+                        f"Cancellation must be made at least 2 hours before the session. "
+                        f"Session starts in {time_str}."
+                    ),
                     "debug": {
-                        "raw_start": start_time_str,
                         "session_start_utc": session_start_utc.isoformat(),
                         "now_utc": now_utc.isoformat(),
                         "hours_until": round(hours_until, 2)
                     }
                 }, 422
         except Exception as e:
-            print(f"ERROR validating time: {str(e)}")
             return {"message": f"Could not validate session time: {str(e)}"}, 500
 
-        # ── Step 5a: Fetch tutor details (Clerk ID for calendar, email for notify) ──
+        # Step 5a: Fetch tutor details (TUTOR ATOMIC SERVICE)
         tutor_id = session.get("tutorId")
-        tutor_resp = requests.get(
-            f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}",
-            timeout=5
-        )
+        tutor_resp = requests.get(f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}", timeout=5)
         if tutor_resp.status_code != 200:
             return {"message": "Failed to retrieve tutor details"}, 500
-        
+
         tutor_data = tutor_resp.json()
         tutor_clerk_id = tutor_data.get("clerkUserId")
-        tutor_email = tutor_data.get("email")
-        tutor_name = tutor_data.get("name", "Tutor")
+        tutor_email    = tutor_data.get("email")
+        tutor_name     = tutor_data.get("name", "Tutor")
 
-        # ── Step 5b: Fetch student email (calendar removal, notify) ──────────
+        # Step 5b: Fetch student details (STUDENT ATOMIC SERVICE)
         student_resp = requests.get(
             f"{STUDENT_SERVICE_URL}/student/by-clerk/{student_clerk_id}",
             headers={"Authorization": auth_header},
@@ -187,20 +193,12 @@ class CancelSession(Resource):
         )
         if student_resp.status_code != 200:
             return {"message": "Failed to retrieve student details"}, 500
-        
-        student_data = student_resp.json()
+
+        student_data  = student_resp.json()
         student_email = student_data.get("email")
-        student_name = student_data.get("name", "Student")
+        student_name  = student_data.get("name", "Student")
 
-        # ── Step 6: Mark session as "cancelled" temporarily ────────────────────
-        requests.put(
-            f"{SESSION_SERVICE_URL}/session/{session_id}",
-            json={"status": "cancelled"},
-            headers={"Authorization": auth_header},
-            timeout=5
-        )
-
-        # ── Step 7: Process refund via Payment Service ─────────────────────────
+        # Step 6: Process refund (PAYMENT ATOMIC SERVICE)
         stripe_session_id = session.get("stripeSessionId")
         refund_status = "skipped"
 
@@ -211,20 +209,13 @@ class CancelSession(Resource):
                 timeout=10
             )
             if refund_resp.status_code not in (200, 201):
-                # Roll back session to "booked" if refund fails
-                requests.put(
-                    f"{SESSION_SERVICE_URL}/session/{session_id}",
-                    json={"status": "booked"},
-                    headers={"Authorization": auth_header},
-                    timeout=5
-                )
                 return {
-                    "message": "Refund failed. Cancellation has been reverted.",
+                    "message": "Refund failed. Session has not been cancelled.",
                     "detail": refund_resp.json()
                 }, 502
             refund_status = refund_resp.json().get("refund_status", "unknown")
 
-        # ── Step 8: Restore slot — "available" with no student ─────────────────
+        # Step 7: Restore slot — "available", clear student + payment refs (SESSSION ATOMIC SERVICE)
         restore_resp = requests.put(
             f"{SESSION_SERVICE_URL}/session/{session_id}",
             json={"status": "available", "studentId": None, "stripeSessionId": None},
@@ -237,7 +228,7 @@ class CancelSession(Resource):
                 "refund_status": refund_status
             }, 207
 
-        # ── Step 9: Remove student from Google Calendar event ──────────────────
+        # Step 8: Remove student from Google Calendar event (CALENDAR ATOMIC SERVICE)
         calendar_event_id = session.get("calendarEventId")
         calendar_updated = False
         if calendar_event_id and tutor_clerk_id and student_email:
@@ -254,31 +245,10 @@ class CancelSession(Resource):
             if calendar_resp.status_code == 200:
                 calendar_updated = True
 
-        # ── Step 10: Send email notifications (Second Last Step) ───────────────
+        # Step 9: Send email for cancellation (EMAIL ATOMIC SERVICE)
         email_notified = False
         try:
-            # Format the time for the email as requested
-            # Thursday 2 Apr 2026 ⋅ 12am – 1am (Singapore Standard Time)
-            end_time_str = session.get("endTime", "")
-            
-            # Use the already parsed session_start_utc but shift it back to SGT (+8h) for the email display
-            # because the user's example 'Thursday 2 Apr' aligns with SGT.
-            display_start = session_start_utc + timedelta(hours=8)
-            # Parse endTime and shift to SGT as well
-            try:
-                base_end = datetime.fromisoformat(end_time_str.replace(" ", "T").replace("Z", "+00:00"))
-                display_end = base_end.astimezone(timezone.utc) + timedelta(hours=8)
-            except:
-                display_end = display_start + timedelta(hours=1) # Fallback
-
-            # Format: Thursday 2 Apr 2026 ⋅ 12am – 1am (Singapore Standard Time)
-            # %A=Weekday, %d=Day, %b=Abbr Month, %Y=Year, %I%p=12h time with AM/PM
-            fmt_date = display_start.strftime("%A %d %b %Y")
-            fmt_start_time = display_start.strftime("%I%p").lower().lstrip('0').replace('12am', '12am').replace('12pm', '12pm')
-            fmt_end_time = display_end.strftime("%I%p").lower().lstrip('0')
-            
-            when_string = f"{fmt_date} ⋅ {fmt_start_time} – {fmt_end_time} (Singapore Standard Time)"
-
+            when_string = _format_email_when(session_start_utc, session.get("endTime", ""))
             email_details = {
                 "student_name": student_name,
                 "subject":      session.get("subject", "Tuition Session"),
@@ -286,25 +256,13 @@ class CancelSession(Resource):
                 "tutor_email":  tutor_email,
                 "date":         when_string
             }
-
-            # 10a. Notify Student
-            publish_email("notification.email", {
-                "email":   student_email,
-                "type":    "CANCELLATION",
-                "details": email_details
-            })
-
-            # 10b. Notify Tutor
-            publish_email("notification.email", {
-                "email":   tutor_email,
-                "type":    "CANCELLATION",
-                "details": email_details
-            })
+            publish_email("notification.email", {"email": student_email, "type": "CANCELLATION", "details": email_details})
+            publish_email("notification.email", {"email": tutor_email,   "type": "CANCELLATION", "details": email_details})
             email_notified = True
         except Exception as e:
             print(f"Non-fatal error sending emails: {str(e)}")
 
-        # ── Step 11: Return success ────────────────────────────────────────────
+        # Step 10: Return success ────────────────────────────────────────────
         return {
             "message": "Session cancelled successfully",
             "session_id": session_id,
