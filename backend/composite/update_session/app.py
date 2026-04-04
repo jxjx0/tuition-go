@@ -19,26 +19,49 @@ TUTOR_SERVICE_URL   = os.environ.get("TUTOR_SERVICE_URL",   "http://localhost:50
 CALENDAR_SERVICE_URL = os.environ.get("CALENDAR_SERVICE_URL", "http://localhost:5005")
 
 update_session_input = api.model('UpdateSessionInput', {
-    'tutorSubjectId': fields.String(required=True, description='The tutor subject UUID'),
-    'startTime':      fields.String(required=True, description='New start time in ISO format'),
-    'endTime':        fields.String(required=True, description='New end time in ISO format'),
-    'durationMins':   fields.Float(required=True,  description='Duration in minutes'),
-    'summary':        fields.String(required=True, description='Calendar event title (e.g. "Mathematics (A-Level)")'),
-    'timezone':       fields.String(description='Timezone (e.g. Asia/Singapore)', default='UTC'),
+    'tutorSubjectId': fields.String(required=True, description='The tutor subject UUID', example='d2eebc99-9c0b-4ef8-bb6d-6bb9bd380a44'),
+    'startTime':      fields.String(required=True, description='New start time in ISO format', example='2027-07-20T14:00:00'),
+    'endTime':        fields.String(required=True, description='New end time in ISO format', example='2027-07-20T15:00:00'),
+    'durationMins':   fields.Float(required=True,  description='Duration in minutes', example=60),
+    'summary':        fields.String(required=True, description='Calendar event title', example='Mathematics (A-Level)'),
+    'timezone':       fields.String(description='Timezone (e.g. Asia/Singapore)', default='UTC', example='Asia/Singapore'),
+})
+
+us_error_model = api.model('UpdateSessionError', {
+    'message': fields.String(description='Error message', example='Session cannot be updated once it has been booked'),
 })
 
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "update_session"}, 200
 
 
 @api.route("/<string:session_id>")
 class UpdateSession(Resource):
     @api.expect(update_session_input)
+    @api.doc(params={'session_id': 'Session UUID'})
+    @api.response(200, 'Session updated and calendar synced')
+    @api.response(207, 'Session updated but calendar sync failed or tutor not found', us_error_model)
+    @api.response(400, 'Missing required fields', us_error_model)
+    @api.response(401, 'Invalid or missing Bearer JWT', us_error_model)
+    @api.response(404, 'Session not found', us_error_model)
+    @api.response(409, 'Session is booked — cannot update', us_error_model)
+    @api.response(500, 'Failed to update session', us_error_model)
     def put(self, session_id):
-        """Updates session times/subject and syncs to Google Calendar. Blocked if status is booked."""
+        """
+        Update session times/subject and sync to Google Calendar. Requires tutor Bearer JWT.
+        Blocked if session status is `booked`.
+
+        **Flow:**
+        1. Fetch session — verify it exists and is not `booked`
+        2. Update session record (Session Service)
+        3. Fetch tutor's Clerk ID (Tutor Service)
+        4. Reschedule Google Calendar event (Calendar Service)
+        """
         auth_header = request.headers.get("Authorization", "")
 
         token = auth_header.replace("Bearer ", "")

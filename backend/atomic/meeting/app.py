@@ -14,7 +14,9 @@ api = Api(app, doc="/docs",
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check. Meeting service is a stub/placeholder with no active endpoints."""
         return {"status": "healthy", "service": "meeting"}, 200
 
 

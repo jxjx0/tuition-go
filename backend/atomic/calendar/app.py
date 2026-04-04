@@ -94,17 +94,56 @@ def get_calendar_service(clerk_user_id: str):
     return build("calendar", "v3", credentials=creds)
 
 
+calendar_error_model = api.model('CalendarError', {
+    'error': fields.String(description='Error message', example='eventId and tutorClerkId are required'),
+})
+
+create_meeting_response = api.model('CreateMeetingResponse', {
+    'message': fields.String(example='Meeting created successfully'),
+    'htmlLink': fields.String(description='Google Calendar event URL', example='https://www.google.com/calendar/event?eid=abc123'),
+    'hangoutLink': fields.String(description='Google Meet URL', example='https://meet.google.com/abc-defg-hij'),
+    'eventId': fields.String(description='Google Calendar event ID', example='abc123xyz456'),
+})
+
+update_meeting_response = api.model('UpdateMeetingResponse', {
+    'message': fields.String(example='Meeting updated successfully'),
+    'eventId': fields.String(description='Google Calendar event ID', example='abc123xyz456'),
+    'hangoutLink': fields.String(description='Google Meet URL', example='https://meet.google.com/abc-defg-hij'),
+})
+
+cancel_meeting_response = api.model('CancelMeetingResponse', {
+    'message': fields.String(example='Student removed from calendar event successfully'),
+    'eventId': fields.String(description='Google Calendar event ID', example='abc123xyz456'),
+})
+
+delete_meeting_response = api.model('DeleteMeetingResponse', {
+    'message': fields.String(example='Meeting deleted successfully'),
+})
+
+reschedule_meeting_response = api.model('RescheduleMeetingResponse', {
+    'message': fields.String(example='Meeting rescheduled successfully'),
+    'eventId': fields.String(description='Google Calendar event ID', example='abc123xyz456'),
+    'hangoutLink': fields.String(description='Google Meet URL', example='https://meet.google.com/abc-defg-hij'),
+})
+
+
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "calendar"}, 200
 
 
 @api.route("/create-meeting")
 class CreateMeeting(Resource):
     @api.expect(meeting_model)
+    @api.response(201, 'Meeting created', create_meeting_response)
+    @api.response(400, 'Missing start_time or end_time', calendar_error_model)
+    @api.response(401, 'Invalid or missing authorization token', calendar_error_model)
+    @api.response(500, 'Google Calendar API error', calendar_error_model)
     def post(self):
-        """Creates a Google Calendar event with a Google Meet link."""
+        """Create a Google Calendar event with a Google Meet link. Requires tutor Bearer JWT in Authorization header."""
         # Extract Clerk user ID from the JWT — Kong already validated the signature
         auth_header = request.headers.get("Authorization", "")
         token = auth_header.replace("Bearer ", "")
@@ -191,8 +230,12 @@ class CreateMeeting(Resource):
 @api.route("/update-meeting")
 class UpdateMeeting(Resource):
     @api.expect(update_meeting_model)
+    @api.response(200, 'Meeting updated', update_meeting_response)
+    @api.response(400, 'Missing required fields', calendar_error_model)
+    @api.response(401, 'Failed to access tutor Google Calendar', calendar_error_model)
+    @api.response(500, 'Google Calendar API error', calendar_error_model)
     def post(self):
-        """Adds a student as attendee to an existing tutor calendar event."""
+        """Add a student as an attendee to an existing tutor calendar event (called on booking)."""
         data = request.json
         event_id = data.get('eventId')
         tutor_clerk_id = data.get('tutorClerkId')
@@ -300,8 +343,12 @@ class UpdateMeeting(Resource):
 @api.route("/cancel-meeting")
 class CancelMeeting(Resource):
     @api.expect(cancel_meeting_model)
+    @api.response(200, 'Student removed from event', cancel_meeting_response)
+    @api.response(400, 'Missing required fields', calendar_error_model)
+    @api.response(401, 'Failed to access tutor Google Calendar', calendar_error_model)
+    @api.response(500, 'Google Calendar API error', calendar_error_model)
     def post(self):
-        """Removes a student attendee from an existing tutor calendar event (on cancellation)."""
+        """Remove a student attendee from an existing tutor calendar event (called on cancellation)."""
         data = request.json
         event_id       = data.get('eventId')
         tutor_clerk_id = data.get('tutorClerkId')
@@ -352,8 +399,12 @@ class CancelMeeting(Resource):
 @api.route("/delete-meeting")
 class DeleteMeeting(Resource):
     @api.expect(delete_meeting_model)
+    @api.response(200, 'Meeting deleted', delete_meeting_response)
+    @api.response(400, 'Missing required fields', calendar_error_model)
+    @api.response(401, 'Failed to access tutor Google Calendar', calendar_error_model)
+    @api.response(500, 'Google Calendar API error', calendar_error_model)
     def post(self):
-        """Deletes a Google Calendar event using the tutor's OAuth token. Notifies all attendees."""
+        """Delete a Google Calendar event using the tutor's OAuth token. Notifies all attendees."""
         data = request.json
         event_id       = data.get('eventId')
         tutor_clerk_id = data.get('tutorClerkId')
@@ -392,8 +443,12 @@ class DeleteMeeting(Resource):
 @api.route("/reschedule-meeting")
 class RescheduleMeeting(Resource):
     @api.expect(reschedule_meeting_model)
+    @api.response(200, 'Meeting rescheduled', reschedule_meeting_response)
+    @api.response(400, 'Missing required fields', calendar_error_model)
+    @api.response(401, 'Failed to access tutor Google Calendar', calendar_error_model)
+    @api.response(500, 'Google Calendar API error', calendar_error_model)
     def post(self):
-        """Updates an existing Google Calendar event's time and/or title."""
+        """Update an existing Google Calendar event's time and/or title (called on session update)."""
         data = request.json
         event_id      = data.get('eventId')
         tutor_clerk_id = data.get('tutorClerkId')

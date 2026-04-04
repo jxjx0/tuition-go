@@ -18,27 +18,48 @@ SESSION_SERVICE_URL = os.environ.get("SESSION_SERVICE_URL", "http://localhost:50
 CALENDAR_SERVICE_URL = os.environ.get("CALENDAR_SERVICE_URL", "http://localhost:5005")
 
 create_session_input = api.model('CreateSessionInput', {
-    'tutorId':        fields.String(required=True, description='The tutor UUID'),
-    'tutorSubjectId': fields.String(required=True, description='The tutor subject UUID'),
-    'startTime':      fields.String(required=True, description='Start time in ISO format (e.g. 2027-03-03T10:00:00)'),
-    'endTime':        fields.String(required=True, description='End time in ISO format'),
-    'durationMins':   fields.Float(required=True, description='Duration in minutes'),
-    'summary':        fields.String(required=True, description='Calendar event title (e.g. "Mathematics (A-Level)")'),
-    'timezone':       fields.String(description='Timezone (e.g. Asia/Singapore)', default='UTC'),
+    'tutorId':        fields.String(required=True, description='The tutor UUID', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
+    'tutorSubjectId': fields.String(required=True, description='The tutor subject UUID', example='d2eebc99-9c0b-4ef8-bb6d-6bb9bd380a44'),
+    'startTime':      fields.String(required=True, description='Start time in ISO format', example='2027-06-15T10:00:00'),
+    'endTime':        fields.String(required=True, description='End time in ISO format', example='2027-06-15T11:00:00'),
+    'durationMins':   fields.Float(required=True, description='Duration in minutes', example=60),
+    'summary':        fields.String(required=True, description='Calendar event title', example='Mathematics (A-Level)'),
+    'timezone':       fields.String(description='Timezone (e.g. Asia/Singapore)', default='UTC', example='Asia/Singapore'),
+})
+
+cs_error_model = api.model('CreateSessionError', {
+    'message': fields.String(description='Error message', example='Tutor has an overlapping session at this time.'),
 })
 
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "create_session"}, 200
 
 
 @api.route("/create-session")
 class CreateSession(Resource):
     @api.expect(create_session_input)
+    @api.response(201, 'Session and calendar event created and linked')
+    @api.response(207, 'Session created but calendar event failed or linking failed', cs_error_model)
+    @api.response(400, 'Missing required fields', cs_error_model)
+    @api.response(401, 'Invalid or missing Bearer JWT', cs_error_model)
+    @api.response(409, 'Tutor has an overlapping session at this time', cs_error_model)
+    @api.response(500, 'Failed to create session', cs_error_model)
     def post(self):
-        """Creates a session record and a Google Calendar event, then links them together."""
+        """
+        Create a session record and a Google Calendar event, then link them. Requires tutor Bearer JWT.
+
+        **Flow:**
+        1. Create session record with status `available` (Session Service)
+        2. Create Google Calendar event with Meet link using tutor's OAuth token (Calendar Service)
+        3. Patch the session with `calendarEventId` and `meetingLink`
+
+        Returns the final session record on 201. Returns 207 if the session was created but the calendar step failed.
+        """
         auth_header = request.headers.get("Authorization", "")
 
         # Verify the caller is authenticated

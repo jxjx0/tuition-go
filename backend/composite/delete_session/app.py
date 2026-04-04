@@ -18,17 +18,41 @@ SESSION_SERVICE_URL  = os.environ.get("SESSION_SERVICE_URL",  "http://localhost:
 TUTOR_SERVICE_URL    = os.environ.get("TUTOR_SERVICE_URL",    "http://localhost:5002")
 CALENDAR_SERVICE_URL = os.environ.get("CALENDAR_SERVICE_URL", "http://localhost:5005")
 
+ds_error_model = api.model('DeleteSessionError', {
+    'message': fields.String(description='Error message', example='Session cannot be deleted once it has been booked. Use cancel instead.'),
+})
+
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "delete_session"}, 200
 
 
 @api.route("/<string:session_id>")
 class DeleteSession(Resource):
+    @api.doc(params={'session_id': 'Session UUID'})
+    @api.response(200, 'Session (and calendar event) deleted successfully', api.model('DeleteSessionResponse', {
+        'message': fields.String(example='Session and calendar event deleted successfully'),
+    }))
+    @api.response(207, 'Session deleted but calendar cleanup failed')
+    @api.response(401, 'Invalid or missing Bearer JWT', ds_error_model)
+    @api.response(404, 'Session not found', ds_error_model)
+    @api.response(409, 'Session is booked — use cancel instead', ds_error_model)
+    @api.response(500, 'Failed to delete session', ds_error_model)
     def delete(self, session_id):
-        """Deletes a session record and its Google Calendar event. Blocked if status is booked."""
+        """
+        Delete a session record and its linked Google Calendar event. Requires tutor Bearer JWT.
+        Blocked if session status is `booked` — use Cancel Session instead.
+
+        **Flow:**
+        1. Fetch session — verify it exists and is not `booked`
+        2. Delete session record (Session Service)
+        3. Fetch tutor's Clerk ID (Tutor Service)
+        4. Delete Google Calendar event (Calendar Service)
+        """
         auth_header = request.headers.get("Authorization", "")
 
         token = auth_header.replace("Bearer ", "")

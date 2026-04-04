@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from flask import Flask, request
-from flask_restx import Api, Resource
+from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -25,6 +25,27 @@ api = Api(app, doc="/docs",
     prefix="/student"
 )
 
+student_register_input = api.model('StudentRegisterInput', {
+    'name': fields.String(required=True, description='Full name of the student', example='Alice Tan'),
+    'email': fields.String(required=True, description='Email address', example='alice@example.com'),
+    'phone': fields.String(description='Phone number (optional)', example='+6591234567'),
+    'clerkUserId': fields.String(required=True, description='Clerk user ID (user_xxx)', example='user_2abc123def456'),
+})
+
+student_model = api.model('StudentResponse', {
+    'studentId': fields.String(description='Student UUID', example='a1b2c3d4-e5f6-7890-abcd-ef1234567890'),
+    'name': fields.String(description='Full name', example='Alice Tan'),
+    'email': fields.String(description='Email address', example='alice@example.com'),
+    'phone': fields.String(description='Phone number', example='+6591234567'),
+    'imageURL': fields.String(description='Profile image URL', example='https://storage.example.com/student.jpg'),
+    'createdAt': fields.String(description='Creation timestamp (ISO 8601)', example='2026-01-15T08:00:00.000Z'),
+    'updatedAt': fields.String(description='Last update timestamp (ISO 8601)', example='2026-03-20T12:30:00.000Z'),
+})
+
+error_model = api.model('StudentError', {
+    'error': fields.String(description='Error message', example='Student not found'),
+})
+
 
 # POST register/create student
 # Called once after Clerk sign-up to persist the student record in Supabase.
@@ -32,7 +53,14 @@ api = Api(app, doc="/docs",
 @api.route("/register")
 class StudentRegister(Resource):
 
+    @api.expect(student_register_input)
+    @api.response(201, 'Student created', student_model)
+    @api.response(200, 'Student already exists (idempotent)', student_model)
+    @api.response(400, 'Missing required fields', error_model)
+    @api.response(409, 'Email already registered', error_model)
+    @api.response(500, 'Internal server error', error_model)
     def post(self):
+        """Register a new student. Idempotent — returns existing record if clerkUserId already exists."""
         data = request.get_json()
 
         if not data:
@@ -93,7 +121,12 @@ class StudentRegister(Resource):
 # GET student by studentId
 @api.route("/<string:studentId>")
 class StudentById(Resource):
+    @api.doc(params={'studentId': 'Student UUID'})
+    @api.response(200, 'Student found', student_model)
+    @api.response(404, 'Student not found', error_model)
+    @api.response(500, 'Internal server error', error_model)
     def get(self, studentId):
+        """Retrieve a student by their studentId."""
         try:
             response = (
                 get_supabase()
@@ -113,10 +146,23 @@ class StudentById(Resource):
             traceback.print_exc()
             return {"error": str(e)}, 500
 
-    # PUT update student profile
-    # Accepts multipart/form-data with optional profileImage file upload
-
+    @api.doc(
+        params={'studentId': 'Student UUID'},
+        description=(
+            'Update student profile. Send as **multipart/form-data**. '
+            'Fields: `name` (string, optional), `phone` (string, optional), '
+            '`profileImage` (file, optional — JPEG/PNG).'
+        )
+    )
+    @api.response(200, 'Student updated successfully', api.model('StudentUpdateResponse', {
+        'message': fields.String(example='Student updated successfully'),
+        'data': fields.Nested(student_model),
+    }))
+    @api.response(400, 'No valid fields to update', error_model)
+    @api.response(404, 'Student not found', error_model)
+    @api.response(500, 'Internal server error', error_model)
     def put(self, studentId):
+        """Update student profile (name, phone, profile image). Multipart/form-data."""
         import uuid
 
         form = request.form
@@ -178,13 +224,22 @@ class StudentById(Resource):
             traceback.print_exc()
             return {"error": str(e)}, 500
 
-    # PATCH update student profile (partial update)
+    @api.doc(description='Alias for PUT — partial update of student profile (multipart/form-data).')
+    @api.response(200, 'Student updated successfully')
+    @api.response(400, 'No valid fields to update', error_model)
+    @api.response(404, 'Student not found', error_model)
     def patch(self, studentId):
+        """Partial update for student profile (same as PUT)."""
         return self.put(studentId)
 
-    # DELETE student account
-
+    @api.doc(params={'studentId': 'Student UUID'})
+    @api.response(200, 'Student deleted successfully', api.model('DeleteStudentResponse', {
+        'message': fields.String(example='a1b2c3d4-e5f6-7890-abcd-ef1234567890 deleted successfully'),
+    }))
+    @api.response(404, 'Student not found', error_model)
+    @api.response(500, 'Internal server error', error_model)
     def delete(self, studentId):
+        """Delete a student account by studentId."""
         try:
             response = (
                 get_supabase()
@@ -209,7 +264,12 @@ class StudentById(Resource):
 @api.route("/by-clerk/<string:clerkUserId>")
 class StudentByClerkId(Resource):
 
+    @api.doc(params={'clerkUserId': 'Clerk user ID (e.g. user_2abc123def456)'})
+    @api.response(200, 'Student found', student_model)
+    @api.response(404, 'Student not found', error_model)
+    @api.response(500, 'Internal server error', error_model)
     def get(self, clerkUserId):
+        """Retrieve a student by their Clerk user ID. Used when only the Clerk session is available."""
         try:
             response = (
                 get_supabase()
@@ -232,7 +292,9 @@ class StudentByClerkId(Resource):
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "student"}, 200
 
 

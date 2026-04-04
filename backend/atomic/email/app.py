@@ -4,6 +4,7 @@ import json
 import threading
 import pika
 from flask import Flask, jsonify
+from flask_restx import Api, Resource, fields
 from flask_cors import CORS
 from email.message import EmailMessage
 from google.auth.transport.requests import Request
@@ -13,6 +14,17 @@ from googleapiclient.discovery import build
 
 app = Flask(__name__)
 CORS(app)
+api = Api(app, doc="/docs",
+    title="Email Service",
+    version="1.0",
+    description=(
+        "Email worker service. Sends transactional emails via Gmail API. "
+        "Emails are triggered by publishing messages to the **tuitiongo.email** RabbitMQ exchange "
+        "(routing key: `notification.email`). "
+        "Supported `type` values: `BOOKING_SUCCESS`, `BOOKING_TUTOR`, `CANCELLATION_STUDENT`, `CANCELLATION_TUTOR`."
+    ),
+    prefix="/email"
+)
 
 # Gmail API scopes
 SCOPES = ['https://www.googleapis.com/auth/gmail.send']
@@ -164,13 +176,47 @@ def start_rabbitmq_consumer():
             print(f" [ERROR] RabbitMQ consumer error: {e}. Retrying in 5 seconds...")
             time.sleep(5)
 
-@app.route("/health", methods=["GET"])
-def health_check():
-    return jsonify({
-        "status": "healthy", 
-        "service": "email-worker", 
-        "gmail_connected": gmail_service is not None
-    }), 200
+health_response_model = api.model('EmailHealthResponse', {
+    'status': fields.String(description='Service status', example='healthy'),
+    'service': fields.String(description='Service name', example='email-worker'),
+    'gmail_connected': fields.Boolean(description='Whether the Gmail API service is initialised', example=True),
+})
+
+
+@api.route("/health")
+class Health(Resource):
+    @api.response(200, 'Service is healthy', health_response_model)
+    def get(self):
+        """
+        Health check. Also reports whether the Gmail API service is connected.
+
+        **RabbitMQ message format** (publish to exchange `tuitiongo.email`, routing key `notification.email`):
+        ```json
+        {
+          "email": "recipient@example.com",
+          "type": "BOOKING_SUCCESS",
+          "details": {
+            "student_name": "Alice Tan",
+            "tutor_name": "Mr John Lim",
+            "subject": "Mathematics",
+            "date": "Saturday 05 Apr 2026",
+            "time": "10am – 11am (Singapore Standard Time)",
+            "meeting_link": "https://meet.google.com/abc-defg-hij"
+          }
+        }
+        ```
+
+        **Supported `type` values:**
+        - `BOOKING_SUCCESS` — sent to student on successful booking
+        - `BOOKING_TUTOR` — sent to tutor on new booking
+        - `CANCELLATION_STUDENT` — sent to student on cancellation
+        - `CANCELLATION_TUTOR` — sent to tutor on cancellation
+        """
+        return jsonify({
+            "status": "healthy",
+            "service": "email-worker",
+            "gmail_connected": gmail_service is not None
+        })
 
 if __name__ == "__main__":
     # Initialize Gmail service once on startup
