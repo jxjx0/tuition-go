@@ -19,23 +19,57 @@ TUTOR_SERVICE_URL   = os.environ.get("TUTOR_SERVICE_URL",   "http://localhost:50
 REVIEW_SERVICE_URL  = os.environ.get("REVIEW_SERVICE_URL",  "https://personal-rkcavjxu.outsystemscloud.com/Review/rest/Review")
 
 review_input = api.model("ReviewInput", {
-    "session_id": fields.String(required=True, description="Session UUID"),
-    "tutor_id":   fields.String(required=True, description="Tutor UUID"),
-    "rating":     fields.Integer(required=True, description="Rating 1–5"),
-    "comment":    fields.String(required=True, description="Review comment"),
+    "session_id": fields.String(required=True, description="Session UUID", example="a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"),
+    "tutor_id":   fields.String(required=True, description="Tutor UUID", example="c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33"),
+    "rating":     fields.Integer(required=True, description="Rating 1–5", example=5),
+    "comment":    fields.String(required=True, description="Review comment", example="Excellent tutor, very clear explanations!"),
+})
+
+review_response = api.model("ReviewResponse", {
+    "message": fields.String(example="Review submitted and tutor rating updated"),
+    "review": fields.Raw(description="Review object returned by OutSystems"),
+    "tutorRating": fields.Raw(description="Updated tutor rating object returned by Tutor Service"),
+})
+
+rt_error_model = api.model("RateTutorError", {
+    "message": fields.String(description="Error message", example="You can only review completed sessions"),
 })
 
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, "Service is healthy")
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "rate_tutor"}, 200
 
 
 @api.route("/review")
 class RateTutor(Resource):
     @api.expect(review_input)
+    @api.response(200, "Review submitted/updated and tutor rating synced", review_response)
+    @api.response(207, "Review submitted but rating fetch or tutor sync failed", review_response)
+    @api.response(400, "Missing/invalid fields or tutor_id mismatch", rt_error_model)
+    @api.response(404, "Session not found", rt_error_model)
+    @api.response(409, "Session is not completed — cannot review", rt_error_model)
+    @api.response(500, "Downstream service error", rt_error_model)
     def post(self):
+        """
+        Submit or update a review for a completed tuition session. Requires student Bearer JWT.
+
+        **Business rules:**
+        - Session must have status `completed`
+        - `tutor_id` must match the session's tutor
+        - If a review already exists for this session, it is updated (PUT); otherwise created (POST)
+
+        **Flow:**
+        1. Validate inputs
+        2. Fetch session — verify status is `completed` and tutor matches (Session Service)
+        3. Check for an existing review on this session (OutSystems Review API)
+        4. Create or update the review (OutSystems Review API)
+        5. Fetch updated average rating and review count (OutSystems Review API)
+        6. Sync `averageRating` and `totalReviews` to the Tutor table (Tutor Service)
+        """
         auth_header = request.headers.get("Authorization", "")
         
         data = request.get_json()
