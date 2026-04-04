@@ -189,6 +189,10 @@ class CancelSession(Resource):
         tutor_email    = tutor_data.get("email")
         tutor_name     = tutor_data.get("name", "Tutor")
 
+        tutor_subject_id = session.get("tutorSubjectId")
+        matching     = next((s for s in tutor_data.get("subjects", []) if s.get("tutorSubjectId") == tutor_subject_id), None)
+        subject_name = matching.get("subject", "Tuition Session") if matching else "Tuition Session"
+
         # Step 5b: Fetch student details (STUDENT ATOMIC SERVICE)
         student_resp = requests.get(
             f"{STUDENT_SERVICE_URL}/student/by-clerk/{student_clerk_id}",
@@ -255,13 +259,13 @@ class CancelSession(Resource):
             when_string = _format_email_when(session_start_utc, session.get("endTime", ""))
             email_details = {
                 "student_name": student_name,
-                "subject":      session.get("subject", "Tuition Session"),
+                "subject":      subject_name,
                 "tutor_name":   tutor_name,
                 "tutor_email":  tutor_email,
                 "date":         when_string
             }
-            publish_email("notification.email", {"email": student_email, "type": "CANCELLATION", "details": email_details})
-            publish_email("notification.email", {"email": tutor_email,   "type": "CANCELLATION", "details": email_details})
+            publish_email("notification.email", {"email": student_email, "type": "CANCELLATION_STUDENT", "details": email_details})
+            publish_email("notification.email", {"email": tutor_email,   "type": "CANCELLATION_TUTOR",  "details": email_details})
             email_notified = True
         except Exception as e:
             print(f"Non-fatal error sending emails: {str(e)}")

@@ -183,6 +183,7 @@ services:
       - STUDENT_SERVICE_URL=http://student:5001
       - CALENDAR_SERVICE_URL=http://calendar:5005
       - PAYMENT_SERVICE_URL=http://payment:5007
+      - RABBITMQ_HOST=rabbitmq
     networks:
       - tuition-network
     restart: unless-stopped
