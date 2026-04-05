@@ -307,7 +307,7 @@ const tutorStats = computed(() => [
                 />
                 <div class="flex-1 min-w-0">
                   <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</h3>
-                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ isBookedSession(session) ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
+                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ (isBookedSession(session) || isCompletedSession(session)) ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
                   <div class="flex flex-wrap items-center gap-3 mt-2 text-xs" style="color:#1B3A5C;opacity:0.6">
                     <span>{{ fmtDate(session.startTime) }}</span>
                     <span>{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }}</span>
