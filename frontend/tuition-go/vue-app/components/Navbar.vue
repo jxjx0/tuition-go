@@ -28,7 +28,7 @@ const tutorProfileLink = computed(() => {
   if (userRole.value === 'tutor' && typeof tutorId === 'string') {
     return {
       to: `/tutor-profile/${tutorId}`,
-      label: 'Edit Profile'
+      label: 'My Profile'
     }
   }
 
@@ -107,6 +107,7 @@ async function handleLogout() {
               </button>
               <div v-if="showUserMenu" class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border py-2 z-50" style="border-color:#E8F0FE">
                 <router-link
+                  v-if="userRole !== 'tutor'"
                   to="/student-profile"
                   @click="showUserMenu=false"
                   class="block px-4 py-2.5 text-sm hover:bg-gray-50"
@@ -114,11 +115,11 @@ async function handleLogout() {
                 >
                   My Profile
                 </router-link>
-                <router-link 
-                  v-if="tutorProfileLink" 
-                  :to="tutorProfileLink.to" 
+                <router-link
+                  v-if="tutorProfileLink"
+                  :to="tutorProfileLink.to"
                   @click="showUserMenu = false"
-                  class="block px-4 py-2.5 text-sm hover:bg-gray-50" 
+                  class="block px-4 py-2.5 text-sm hover:bg-gray-50"
                   style="color:#1B3A5C">
                   {{ tutorProfileLink.label }}
                 </router-link>
