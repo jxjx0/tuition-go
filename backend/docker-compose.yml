@@ -15,7 +15,6 @@ services:
       - student
       - tutor
       - session
-      - meeting
       - calendar
       - email
       - payment
@@ -93,17 +92,6 @@ services:
       - CLERK_JWKS_URL=${CLERK_JWKS_URL}
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
-    networks:
-      - tuition-network
-    restart: unless-stopped
-
-  meeting:
-    build:
-      context: ./atomic/meeting
-      dockerfile: Dockerfile
-    container_name: meeting-service
-    ports:
-      - "5004:5004"
     networks:
       - tuition-network
     restart: unless-stopped
