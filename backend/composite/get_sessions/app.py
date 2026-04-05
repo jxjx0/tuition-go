@@ -80,8 +80,9 @@ class StudentSessions(Resource):
 
         **Flow:**
         1. Fetch all sessions for the student (Session Service)
-        2. For each session: fetch tutor name, imageURL, subject name, academic level, and hourly rate (Tutor Service)
-        3. Calculate `totalPrice` from hourly rate × durationMins
+        2. For each session: fetch subject name, academic level, and hourly rate via `GET /tutor/subjects/{tutorSubjectId}` (Tutor Service)
+        3. For each session: fetch tutor name and imageURL via `GET /tutor/{tutorId}` (Tutor Service)
+        4. Calculate `totalPrice` from hourly rate × durationMins
         """
         try:
             # 1. Get all sessions for the student
@@ -133,8 +134,10 @@ class TutorSessions(Resource):
 
         **Flow:**
         1. Fetch all sessions for the tutor (Session Service)
-        2. For each session: fetch tutor subject/pricing (Tutor Service) and student name/avatar (Student Service)
-        3. Calculate `totalPrice` from hourly rate × durationMins
+        2. For each session: fetch subject name, academic level, and hourly rate via `GET /tutor/subjects/{tutorSubjectId}` (Tutor Service)
+        3. For each session: fetch tutor name and imageURL via `GET /tutor/{tutorId}` (Tutor Service)
+        4. For each session: fetch student name and imageURL via `GET /student/{studentId}` (Student Service)
+        5. Calculate `totalPrice` from hourly rate × durationMins
         """
         try:
             # 1. Get all sessions for the tutor
@@ -186,8 +189,10 @@ class SessionDetail(Resource):
 
         **Flow:**
         1. Fetch session by ID (Session Service)
-        2. Enrich with tutor/subject/pricing and student details (Tutor + Student Services)
-        3. Fetch the review for this specific session, if any (OutSystems Review API)
+        2. Fetch subject name, academic level, and hourly rate via `GET /tutor/subjects/{tutorSubjectId}` (Tutor Service)
+        3. Fetch tutor name and imageURL via `GET /tutor/{tutorId}` (Tutor Service)
+        4. Fetch student name and imageURL via `GET /student/{studentId}` (Student Service)
+        5. Fetch the review for this specific session, if any (OutSystems Review API)
         """
         try:
             # 1. Get the specific session
