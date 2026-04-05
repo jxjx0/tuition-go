@@ -46,6 +46,7 @@ class Checkout(Resource):
     @api.response(200, 'Stripe checkout URL returned', checkout_response)
     @api.response(400, 'Missing session_id or student_id', error_model)
     @api.response(404, 'Session or tutor subject not found', error_model)
+    @api.response(409, 'Student has an overlapping booked session', error_model)
     @api.response(500, 'Downstream service error', error_model)
     def post(self):
         """
@@ -53,10 +54,11 @@ class Checkout(Resource):
 
         **Flow:**
         1. Fetch session details (Session Service)
-        2. Fetch tutor name and hourly rate (Tutor Service)
-        3. Fetch student email (Student Service)
-        4. Calculate total price server-side
-        5. Create Stripe checkout session (Payment Service)
+        2. Check student has no overlapping booked sessions (Session Service)
+        3. Fetch tutor name and hourly rate (Tutor Service)
+        4. Fetch student email (Student Service)
+        5. Calculate total price server-side
+        6. Create Stripe checkout session (Payment Service)
 
         Returns a Stripe redirect URL.
         """
@@ -81,8 +83,23 @@ class Checkout(Resource):
         tutor_subject_id = session.get("tutorSubjectId")
         duration_mins = session.get("durationMins", 0)
         start_time = session.get("startTime", "")
+        end_time = session.get("endTime", "")
 
-        # 2. Fetch tutor (includes name + subjects[]) in one call
+        # 2. Check student has no overlapping booked sessions
+        existing_resp = requests.get(
+            f"{SESSION_SERVICE_URL}/session/all",
+            params={"studentId": student_id},
+            timeout=5
+        )
+        if existing_resp.status_code == 200:
+            for s in existing_resp.json():
+                if (s.get("status") == "booked"
+                        and s.get("sessionId") != session_id
+                        and s.get("startTime") < end_time
+                        and s.get("endTime") > start_time):
+                    return {"message": "You already have a booked session that overlaps with this time slot"}, 409
+
+        # 3. Fetch tutor (includes name + subjects[]) in one call
         tutor_resp = requests.get(
             f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}",
             timeout=5

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+
+const today = new Date().toISOString().slice(0, 10)
 import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
 import { findTutorById } from "../composables/useTutors"
@@ -64,6 +66,10 @@ async function handleCreateSlot() {
     slotError.value = 'End time must be after start time'
     return
   }
+  if (new Date(startTime) < new Date()) {
+    slotError.value = 'Session start time must be in the future'
+    return
+  }
 
   // Find the subject name for the meeting summary
   const selectedSubject = tutor.value?.subjects?.find(s => s.tutorSubjectId === slotForm.value.tutorSubjectId)
@@ -116,13 +122,19 @@ async function fetchSessions(id: string) {
 
 const api = useApi()
 const tutorReviews = ref<any[]>([])
+const reviewsLoading = ref(false)
 
 async function fetchReviews(id: string) {
+  reviewsLoading.value = true
   try {
     const { data } = await api.get(`/get-tutor/${id}`)
-    tutorReviews.value = data?.reviews ?? []
+    tutorReviews.value = (data?.reviews ?? []).sort((a: any, b: any) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
   } catch {
     tutorReviews.value = []
+  } finally {
+    reviewsLoading.value = false
   }
 }
 
@@ -184,8 +196,8 @@ const totalEarnings = computed(() => {
 })
 
 const tutorStats = computed(() => [
-  { value: totalSessions.value, label: 'Total Sessions', bg: '#E8F0FE',              iconColor: '#4A90D9' },
-  { value: totalEarnings.value, label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
+  { value: sessionsLoading.value ? '-' : totalSessions.value, label: 'Total Sessions', bg: '#E8F0FE',              iconColor: '#4A90D9' },
+  { value: sessionsLoading.value ? '-' : totalEarnings.value, label: 'Total Earnings', bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
   { value: tutor.value?.averageRating?.toFixed(1) ?? '0.0',  label: 'Average Rating', bg: '#E8F0FE',              iconColor: '#4A90D9' },
   { value: String(tutor.value?.totalReviews ?? '0'), label: 'Total Reviews',  bg: 'rgba(46,170,79,0.1)', iconColor: '#2EAA4F' },
 ])
@@ -200,7 +212,7 @@ const tutorStats = computed(() => [
           <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Welcome back, {{ tutor?.name ?? 'Tutor' }}. Manage your sessions and availability.</p>
         </div>
         <div class="flex gap-4">
-          <button @click="showCreateSlot=!showCreateSlot" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#2EAA4F">+ Create Session Slot</button>
+          <button @click="showCreateSlot=!showCreateSlot" :disabled="sessionsLoading" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" style="background-color:#2EAA4F">+ Create Session Slot</button>
         </div>
       </div>
 
@@ -220,7 +232,7 @@ const tutorStats = computed(() => [
           <!-- Date -->
           <div>
             <label class="text-xs font-semibold uppercase mb-1.5 block" style="color:#1B3A5C;opacity:0.5">Date</label>
-            <input v-model="slotForm.date" type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none" style="border-color:#E8F0FE;color:#1B3A5C"/>
+            <input v-model="slotForm.date" type="date" :min="today" class="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none" style="border-color:#E8F0FE;color:#1B3A5C"/>
           </div>
           <!-- Start time -->
           <div>
@@ -295,7 +307,7 @@ const tutorStats = computed(() => [
                 />
                 <div class="flex-1 min-w-0">
                   <h3 class="text-sm font-bold" style="color:#1B3A5C">{{ session.subjectName }} ({{ session.academicLevel }})</h3>
-                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ isBookedSession(session) ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
+                  <p class="text-xs mt-0.5" style="color:#1B3A5C;opacity:0.7">{{ (isBookedSession(session) || isCompletedSession(session)) ? (session.studentName ? 'with ' + session.studentName : 'Student #' + session.studentId?.slice(0, 8)) : '' }}</p>
                   <div class="flex flex-wrap items-center gap-3 mt-2 text-xs" style="color:#1B3A5C;opacity:0.6">
                     <span>{{ fmtDate(session.startTime) }}</span>
                     <span>{{ fmtTime(session.startTime) }} - {{ fmtTime(session.endTime) }}</span>
@@ -318,22 +330,30 @@ const tutorStats = computed(() => [
           </div>
         </div>
         <div>
-          <h2 class="text-lg font-bold mb-4" style="color:#1B3A5C">Recent Reviews</h2>
-          <div class="space-y-3">
-            <div v-for="review in tutorReviews" :key="review.review_id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
-              <div class="flex items-center gap-2 mb-2">
-                <img :src="avatarUrl(review.studentAvatar, review.student_id)" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
-                <div class="flex-1 min-w-0">
-                  <p class="text-xs font-semibold" style="color:#1B3A5C">{{ review.studentName || 'Anonymous' }}</p>
-                  <StarRating :modelValue="review.rating" size="sm"/>
+          <h2 class="text-lg font-bold mb-4" style="color:#1B3A5C">All Reviews</h2>
+          <div class="overflow-y-auto space-y-3 pr-1" style="max-height:520px">
+            <div v-if="reviewsLoading" class="text-center py-8 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
+              <svg class="animate-spin w-6 h-6 mx-auto" style="color:#4A90D9" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+              </svg>
+            </div>
+            <template v-else>
+              <div v-for="review in tutorReviews" :key="review.review_id" class="rounded-2xl border p-4" style="background-color:#fff;border-color:#E8F0FE">
+                <div class="flex items-center gap-2 mb-2">
+                  <img :src="avatarUrl(review.studentAvatar, review.student_id)" class="w-8 h-8 rounded-full" crossorigin="anonymous"/>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-xs font-semibold" style="color:#1B3A5C">{{ review.studentName || 'Anonymous' }}</p>
+                    <StarRating :modelValue="review.rating" size="sm"/>
+                  </div>
                 </div>
+                <p class="text-xs leading-relaxed" style="color:#1B3A5C;opacity:0.75;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ review.comment }}</p>
+                <p class="text-xs mt-2" style="color:#1B3A5C;opacity:0.45">{{ review.subject }} &middot; {{ fmtDate(review.createdAt) }}</p>
               </div>
-              <p class="text-xs leading-relaxed" style="color:#1B3A5C;opacity:0.75;display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ review.comment }}</p>
-              <p class="text-xs mt-2" style="color:#1B3A5C;opacity:0.45">{{ review.subject }} &middot; {{ fmtDate(review.createdAt) }}</p>
-            </div>
-            <div v-if="!tutorReviews.length" class="text-center py-8 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
-              <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No reviews yet</p>
-            </div>
+              <div v-if="!tutorReviews.length" class="text-center py-8 rounded-2xl border" style="background-color:#fff;border-color:#E8F0FE">
+                <p class="text-sm" style="color:#1B3A5C;opacity:0.6">No reviews yet</p>
+              </div>
+            </template>
           </div>
         </div>
       </div>

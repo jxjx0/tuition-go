@@ -70,19 +70,6 @@ services:
         methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
-  - name: meeting-service
-    url: http://meeting:5004/meeting
-    plugins:
-      - name: jwt
-        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
-      - name: acl
-        config: {allow: [authenticated], hide_groups_header: true}
-    routes:
-      - name: meeting-route
-        paths: [/api/v1/meetings]
-        methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
-        strip_path: true
-
   - name: calendar-service
     url: http://calendar:5005/calendar
     routes:
@@ -199,6 +186,19 @@ services:
       - name: cancel-session-route
         paths: [/api/v1/cancel-session]
         methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
+        strip_path: true
+
+  - name: complete-session-service
+    url: http://complete-session:5108/complete-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: complete-session-route
+        paths: [/api/v1/complete-session]
+        methods: [GET, POST, OPTIONS]
         strip_path: true
 
   - name: rate-tutor-service

@@ -180,10 +180,15 @@ async function saveProfile() {
     if (form.profileImage) {
       formData.append("profileImage", form.profileImage)
     }
-    await updateProfile(tutorId.value, formData)
+    const result = await updateProfile(tutorId.value, formData)
+    const newImageURL = result?.data?.[0]?.imageURL
+    if (newImageURL) {
+      avatarPreview.value = newImageURL
+      await user.value?.update({ unsafeMetadata: { ...user.value.unsafeMetadata, imageURL: newImageURL } })
+    }
     originalData.value = JSON.stringify(normalizeForm())
     form.photo = null
-    form.profileImage = null  // ← also reset this
+    form.profileImage = null
     saved.value = true
     setTimeout(() => { saved.value = false }, 3000)
   } catch (err: any) {

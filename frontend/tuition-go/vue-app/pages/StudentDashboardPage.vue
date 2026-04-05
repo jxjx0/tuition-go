@@ -132,39 +132,6 @@ watch(
   { immediate: true },
 );
 
-const dashStats = computed(() => {
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-
-  const completedThisMonth = completedSessions.value.filter((s) => {
-    const d = new Date(s.date);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  });
-  const hoursCompletedThisMonth =
-    completedThisMonth.reduce((sum, s) => sum + s.durationMins, 0) / 60;
-
-  return [
-    {
-      value: String(upcomingSessions.value.length),
-      label: "Upcoming Sessions",
-      bg: "#E8F0FE",
-      iconColor: "#4A90D9",
-    },
-    {
-      value: String(completedSessions.value.length),
-      label: "Completed",
-      bg: "rgba(46,170,79,0.1)",
-      iconColor: "#2EAA4F",
-    },
-    {
-      value: `${hoursCompletedThisMonth.toFixed(1)}h`,
-      label: "Hours This Month",
-      bg: "#E8F0FE",
-      iconColor: "#4A90D9",
-    },
-  ];
-});
 
 function isWithinReviewWindow(sessionDate: string): boolean {
   const session = new Date(sessionDate);
@@ -197,43 +164,6 @@ function isWithinReviewWindow(sessionDate: string): boolean {
         >
       </div>
 
-      <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-        <div
-          v-for="stat in dashStats"
-          :key="stat.label"
-          class="rounded-2xl border p-5"
-          style="background-color: #fff; border-color: #e8f0fe"
-        >
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            :style="{ backgroundColor: stat.bg }"
-          >
-            <svg
-              class="w-5 h-5"
-              :style="{ color: stat.iconColor }"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <p class="text-2xl font-extrabold" style="color: #1b3a5c">
-            {{ stat.value }}
-          </p>
-          <p
-            class="text-xs font-medium mt-0.5"
-            style="color: #1b3a5c; opacity: 0.6"
-          >
-            {{ stat.label }}
-          </p>
-        </div>
-      </div>
 
       <div v-if="loading" class="text-center py-20">
         <div class="inline-block animate-spin">
