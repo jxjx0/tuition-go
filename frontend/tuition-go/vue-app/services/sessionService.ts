@@ -36,7 +36,7 @@ export function useSessionService() {
     },
 
     completeSession(sessionId: string, tutorId: string) {
-      return api.post(`/sessions/${sessionId}/complete`, { tutorId })
+      return api.post('/complete-session/complete', { session_id: sessionId, tutor_id: tutorId })
     },
 
     createSessionWithCalendar(payload: {

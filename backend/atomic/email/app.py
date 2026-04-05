@@ -21,7 +21,7 @@ api = Api(app, doc="/docs",
         "Email worker service. Sends transactional emails via Gmail API. "
         "Emails are triggered by publishing messages to the **tuitiongo.email** RabbitMQ exchange "
         "(routing key: `notification.email`). "
-        "Supported `type` values: `BOOKING_SUCCESS`, `BOOKING_TUTOR`, `CANCELLATION_STUDENT`, `CANCELLATION_TUTOR`."
+        "Supported `type` values: `BOOKING_SUCCESS`, `BOOKING_TUTOR`, `CANCELLATION_STUDENT`, `CANCELLATION_TUTOR`, `SESSION_COMPLETE_STUDENT`."
     ),
     prefix="/email"
 )
@@ -145,6 +145,15 @@ def process_email_message(ch, method, properties, body):
                 f"{details.get('student_name')} has cancelled their booking for {details.get('subject')}.\n\n"
                 f"When: {details.get('date')}\n\n"
                 "The slot has been restored and is available for new bookings."
+            )
+        elif email_type == "SESSION_COMPLETE_STUDENT":
+            subject = "Your Lesson is Complete — Leave a Review on TuitionGo"
+            content = (
+                f"Hi {details.get('student_name', 'Student')}!\n\n"
+                f"Your {details.get('subject')} lesson with {details.get('tutor_name')} is now complete.\n\n"
+                f"When: {details.get('date')}\n\n"
+                f"We'd love to hear how it went! Head over to TuitionGo to leave a review for {details.get('tutor_name')}.\n\n"
+                "Your feedback helps other students find great tutors."
             )
         else:
             subject = "Notification - TuitionGo"

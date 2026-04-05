@@ -33,6 +33,7 @@ api = Api(app, doc="/docs",
 
 tutor_subject_model = api.model('TutorSubject', {
     'tutorSubjectId': fields.String(description='Tutor subject UUID', example='d2eebc99-9c0b-4ef8-bb6d-6bb9bd380a44'),
+    'tutorId': fields.String(description='Tutor UUID (null if removed from tutor)', example='c1eebc99-9c0b-4ef8-bb6d-6bb9bd380a33'),
     'subject': fields.String(description='Subject name', example='Mathematics'),
     'academicLevel': fields.String(description='Academic level', example='Primary 5'),
     'hourlyRate': fields.Float(description='Hourly rate in SGD', example=80.0),
@@ -198,71 +199,6 @@ class SearchTutors(Resource):
         except Exception as e:
             print(f"Search error: {str(e)}")
             return {"error": str(e)}, 500
-
-#GET subjects taught by tutor with filter subject and/or academic level and/or sort and/or tutor name (includes price sorting)
-# @api.route("/tutors/search/subjects")
-# class SearchTutors(Resource):
-#     def get(self):
-
-#         subject = request.args.get("subject")
-#         academic_level = request.args.get("academicLevel")
-#         name = request.args.get("name")
-#         sort = request.args.get("sort")
-
-#         try:
-#             query = supabase.table("TutorSubjects").select(
-#                 """
-#                 tutorSubjectId,
-#                 subject,
-#                 academicLevel,
-#                 hourlyRate,
-#                 Tutor (
-#                     tutorId,
-#                     name,
-#                     email,
-#                     phone,
-#                     averageRating,
-#                     totalReviews,
-#                     bio
-#                 )
-#                 """
-#             )
-
-#             # Filters
-#             if subject:
-#                 query = query.eq("subject", subject)
-
-#             if academic_level:
-#                 query = query.eq("academicLevel", academic_level)
-
-#             # Search by tutor name
-#             if name:
-#                 query = query.ilike("Tutor.name", f"%{name}%")
-
-#             # Sorting
-#             if sort == "priceLowHigh":
-#                 query = query.order("hourlyRate", desc=False)
-
-#             elif sort == "priceHighLow":
-#                 query = query.order("hourlyRate", desc=True)
-
-#             elif sort == "highestRated":
-#                 query = query.order("Tutor.averageRating", desc=True)
-
-#             elif sort == "mostReviews":
-#                 query = query.order("Tutor.totalReviews", desc=True)
-
-#             response = query.execute()
-
-#             # ✅ Remove rows where Tutor is null
-#             filtered_results = [
-#                 record for record in response.data if record.get("Tutor") is not None
-#             ]
-
-#             return filtered_results, 200
-
-#         except Exception as e:
-#             return {"error": str(e)}, 500
 
 #GET, PUT, DELETE for a specific tutor by ID
 @api.route("/<string:tutorID>")
@@ -727,20 +663,43 @@ class TutorSubjectById(Resource):
 
 
     @api.doc(params={'tutorId': 'Tutor UUID', 'subjectId': 'Tutor subject UUID'})
-    @api.response(200, 'Subject deleted', api.model('DeleteSubjectResponse', {
-        'message': fields.String(example='Subject deleted successfully'),
+    @api.response(200, 'Subject removed from tutor', api.model('RemoveSubjectResponse', {
+        'message': fields.String(example='Subject removed from tutor successfully'),
     }))
     @api.response(404, 'Subject not found', tutor_error_model)
     @api.response(500, 'Internal server error', tutor_error_model)
     def delete(self, tutorId, subjectId):
-        """Delete a subject that a tutor teaches."""
+        """Remove a subject from a tutor (soft delete: set tutorId to null). Keeps the subject record for session references."""
         try:
-            response = (supabase.table("TutorSubjects").delete().eq("tutorSubjectId", subjectId).eq("tutorId", tutorId).execute())
+            # Update tutorId to null instead of deleting
+            response = (supabase.table("TutorSubjects").update({"tutorId": None}).eq("tutorSubjectId", subjectId).eq("tutorId", tutorId).execute())
 
             if not response.data:
                 return {"error": "Subject not found"}, 404
 
-            return {"message": "Subject deleted successfully"}, 200
+            return {"message": "Subject removed from tutor successfully"}, 200
+
+        except Exception as e:
+            return {"error": str(e)}, 500
+
+
+@api.route("/subjects/<string:subjectId>")
+class SubjectById(Resource):
+
+    @api.doc(params={'subjectId': 'Tutor subject UUID'})
+    @api.marshal_with(tutor_subject_model)
+    @api.response(200, 'Subject found', tutor_subject_model)
+    @api.response(404, 'Subject not found', tutor_error_model)
+    @api.response(500, 'Internal server error', tutor_error_model)
+    def get(self, subjectId):
+        """Retrieve a subject by tutorSubjectId (includes removed subjects for session references)."""
+        try:
+            response = supabase.table("TutorSubjects").select("*").eq("tutorSubjectId", subjectId).execute()
+
+            if response.data:
+                return response.data[0], 200
+
+            return {"error": "Subject not found"}, 404
 
         except Exception as e:
             return {"error": str(e)}, 500
