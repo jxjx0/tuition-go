@@ -52,7 +52,12 @@ watch(() => user.value, async (u) => {
   }
 }, { immediate: true })
 const userName = computed(() => user.value?.fullName ?? user.value?.firstName ?? 'User')
-const userAvatar = computed(() => user.value?.imageUrl ?? 'https://api.dicebear.com/9.x/notionists/svg?seed=User')
+const userAvatar = computed(() => {
+  const metadata = user.value?.unsafeMetadata as Record<string, unknown> | undefined
+  return (typeof metadata?.imageURL === 'string' && metadata.imageURL)
+    ? metadata.imageURL
+    : (user.value?.imageUrl ?? 'https://api.dicebear.com/9.x/notionists/svg?seed=User')
+})
 
 const dashboardLink = computed(() => {
   if (!isLoggedIn.value) return null
