@@ -74,9 +74,9 @@ async function handleSubmit() {
     }
 
     const { data } = await studentService.update(studentId.value, formData)
-    // Update the avatar preview with the new URL from the server
     if (data?.data?.imageURL) {
       avatarPreview.value = data.data.imageURL
+      await user.value?.update({ unsafeMetadata: { ...user.value.unsafeMetadata, imageURL: data.data.imageURL } })
     }
     form.value.profileImage = null
     success.value = true
