@@ -79,7 +79,9 @@ async function bookSession() {
       student_id: currentStudentId.value,
     });
     window.location.href = data.url;
-  } catch (err) {
+  } catch (err: any) {
+    const msg = err?.response?.data?.message;
+    error.value = msg || "Failed to initiate booking. Please try again.";
     console.error("Failed to initiate booking", err);
     booking.value = false;
   }
