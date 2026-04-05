@@ -256,6 +256,6 @@ The frontend will be available at `http://localhost:5173`.
 | **Lek Jan Jin Lucas** | Frontend design, Calendar Service, Cancel Session Service |
 | **Soon Shi Heng Kevan** | Backend setup, Student Service, Cancel Session Service, Clerk Authentication |
 | **Chan Jing Xiang** | Frontend design, Checkout Service, Process Booking Service, Session Service |
-| **Aaralyn Chow Yuet Leng** | Tutor Service, Checkout Service |
+| **Aaralyn Chow Yuet Leng** | Tutor Service, Process Booking Service |
 | **Fabian Reynadi Suwibowo** | Email Service, RabbitMQ, Rate Tutor Service |
 | **Liau Jun Rong (Jerome)** | Payment Service, Review Service (OutSystems), Rate Tutor Service |
