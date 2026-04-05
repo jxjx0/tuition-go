@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 load_dotenv()
 
 app = Flask(__name__)
+app.config['RESTX_MASK_SWAGGER'] = False
 CORS(app)
 api = Api(app, doc="/docs",
     title="Session Service",
