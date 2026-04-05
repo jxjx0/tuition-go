@@ -21,6 +21,7 @@ key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url,key)
 
 app = Flask(__name__)
+app.config['RESTX_MASK_SWAGGER'] = False
 CORS(app)
 api = Api(app, doc="/docs",
     title="Tutor Service",
