@@ -122,7 +122,9 @@ async function fetchReviews(id: string) {
   reviewsLoading.value = true
   try {
     const { data } = await api.get(`/get-tutor/${id}`)
-    tutorReviews.value = data?.reviews ?? []
+    tutorReviews.value = (data?.reviews ?? []).sort((a: any, b: any) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
   } catch {
     tutorReviews.value = []
   } finally {
