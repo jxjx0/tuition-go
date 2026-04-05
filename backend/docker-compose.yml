@@ -232,6 +232,20 @@ services:
       - tuition-network
     restart: unless-stopped
 
+  delete-subject:
+    build:
+      context: ./composite/delete_subject
+      dockerfile: Dockerfile
+    container_name: delete-subject-service
+    ports:
+      - "5110:5110"
+    environment:
+      - SESSION_SERVICE_URL=http://session:5003
+      - TUTOR_SERVICE_URL=http://tutor:5002
+    networks:
+      - tuition-network
+    restart: unless-stopped
+
   cancel-session:
     build:
       context: ./composite/cancel_session

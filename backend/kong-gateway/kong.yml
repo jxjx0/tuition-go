@@ -188,6 +188,19 @@ services:
         methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
+  - name: delete-subject-service
+    url: http://delete-subject:5110/delete-subject
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: delete-subject-route
+        paths: [/api/v1/delete-subject]
+        methods: [DELETE, OPTIONS]
+        strip_path: true
+
   - name: cancel-session-service
     url: http://cancel-session:5101/cancel-session
     plugins:
