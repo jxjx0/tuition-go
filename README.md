@@ -162,37 +162,48 @@ cp backend/.env.example backend/.env
 Fill in the required values:
 
 ```env
+# Clerk
+CLERK_SECRET_KEY=
+
 # Supabase
 SUPABASE_URL=
 SUPABASE_KEY=
 
-# Clerk
-CLERK_JWKS_URL=
-CLERK_SECRET_KEY=
-
 # Stripe
-STRIPE_SECRET_KEY=
 STRIPE_PUBLISHABLE_KEY=
-
-# RabbitMQ
-RABBITMQ_HOST=rabbitmq
+STRIPE_SECRET_KEY=
 ```
 
 ### 3. Start the backend
 
 ```bash
 cd backend
-docker compose up --build
+docker compose up --build kong
 ```
 
 This starts all atomic and composite services, Kong API Gateway, and RabbitMQ. Kong Admin UI is available at `http://localhost:8002`.
 
-### 4. Start the frontend
+### 4. Configure frontend environment variables
+
+Create a `.env.local` file inside `frontend/tuition-go/`:
+
+```bash
+cp frontend/tuition-go/.env.local.example frontend/tuition-go/.env.local
+```
+
+Fill in the required values:
+
+```env
+# Clerk (get this from your Clerk dashboard → API Keys)
+VITE_CLERK_PUBLISHABLE_KEY=
+```
+
+### 5. Start the frontend
 
 ```bash
 cd frontend/tuition-go
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 The frontend will be available at `http://localhost:5173`.
