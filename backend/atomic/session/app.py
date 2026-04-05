@@ -75,7 +75,9 @@ session_update_model = api.model('SessionUpdate', {
 
 @api.route("/health")
 class Health(Resource):
+    @api.response(200, 'Service is healthy')
     def get(self):
+        """Health check."""
         return {"status": "healthy", "service": "session"}, 200
 
 
@@ -118,8 +120,11 @@ class CreateSession(Resource):
 class SessionDetail(Resource):
 
     @api.marshal_with(session_model)
+    @api.response(200, 'Session found', session_model)
+    @api.response(404, 'Session not found')
+    @api.response(500, 'Internal server error')
     def get(self, sessionId):
-        """Retrieve a session record."""
+        """Retrieve a session record by ID."""
         try:
             response = supabase.table('Session').select('*').eq('sessionId', sessionId).execute()
             if response.data:
@@ -131,6 +136,9 @@ class SessionDetail(Resource):
 
     @api.expect(session_update_model)
     @api.marshal_with(session_model)
+    @api.response(200, 'Session updated', session_model)
+    @api.response(404, 'Session not found')
+    @api.response(500, 'Internal server error')
     def put(self, sessionId):
         """Update a session record. Null values are explicitly applied (e.g. to clear studentId)."""
         data = request.get_json()
@@ -163,6 +171,9 @@ class SessionDetail(Resource):
             return {'message': 'Failed to update session', 'error': str(e)}, 500
 
 
+    @api.response(200, 'Session deleted successfully')
+    @api.response(404, 'Session not found')
+    @api.response(500, 'Internal server error')
     def delete(self, sessionId):
         """Delete a session record."""
         try:
@@ -180,6 +191,13 @@ complete_model = api.model('CompleteSession', {
 @api.route("/<string:sessionId>/complete")
 class CompleteSession(Resource):
     @api.expect(complete_model)
+    @api.response(200, 'Session marked as completed', session_model)
+    @api.response(400, 'tutorId missing')
+    @api.response(403, 'Not authorised to complete this session')
+    @api.response(404, 'Session not found')
+    @api.response(409, 'Session is not in booked status')
+    @api.response(422, 'Session end time has not passed yet')
+    @api.response(500, 'Internal server error')
     def post(self, sessionId):
         """Mark a booked session as completed. Validates tutor ownership and that end time has passed."""
         data = request.get_json() or {}
@@ -230,6 +248,9 @@ class SessionList(Resource):
 
     @api.doc(params={'tutorId': 'The ID of the tutor to filter by.', 'studentId': 'The ID of the student to filter by.'})
     @api.marshal_list_with(session_model)
+    @api.response(200, 'Sessions returned')
+    @api.response(404, 'No sessions found for the given filters')
+    @api.response(500, 'Internal server error')
     def get(self):
         """Retrieve sessions, optionally filtered by tutorId and/or studentId."""
         tutor_id = request.args.get('tutorId')
