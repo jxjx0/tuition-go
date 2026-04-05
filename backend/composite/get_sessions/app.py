@@ -248,50 +248,50 @@ def _enrich_sessions(sessions):
             tutor_id = session.get('tutorId')
             tutor_subject_id = session.get('tutorSubjectId')
 
-            # Single call to GET /tutor/{id} — returns name, imageURL, and subjects[]
+            # Fetch subject details directly by tutorSubjectId
+            if tutor_subject_id:
+                subject_response = requests.get(
+                    f"{TUTOR_SERVICE_URL}/tutor/subjects/{tutor_subject_id}",
+                    timeout=5
+                )
+
+                if subject_response.status_code == 200:
+                    subject_data = subject_response.json()
+                    enhanced_session['subjectName'] = subject_data.get('subject', 'Unknown')
+                    enhanced_session['academicLevel'] = subject_data.get('academicLevel', 'Unknown')
+                    hourly_rate = subject_data.get('hourlyRate', 0)
+                    duration_mins = session.get('durationMins', 0)
+                    if duration_mins and hourly_rate:
+                        enhanced_session['totalPrice'] = round(hourly_rate * (duration_mins / 60.0), 2)
+                    else:
+                        enhanced_session['totalPrice'] = 0.0
+                else:
+                    enhanced_session['subjectName'] = 'Unknown'
+                    enhanced_session['academicLevel'] = 'Unknown'
+                    enhanced_session['totalPrice'] = 0.0
+                    hourly_rate = 0
+            else:
+                enhanced_session['subjectName'] = 'Unknown'
+                enhanced_session['academicLevel'] = 'Unknown'
+                enhanced_session['totalPrice'] = 0.0
+                hourly_rate = 0
+
+            # Fetch tutor details using session's tutorId
             if tutor_id:
                 tutor_response = requests.get(
                     f"{TUTOR_SERVICE_URL}/tutor/{tutor_id}",
                     timeout=5
                 )
-
                 if tutor_response.status_code == 200:
                     tutor_data = tutor_response.json()
                     enhanced_session['tutorName'] = tutor_data.get('name', 'Unknown')
                     enhanced_session['tutorImageUrl'] = tutor_data.get('imageURL', None)
-
-                    # Find matching subject from the nested subjects list
-                    subjects = tutor_data.get('subjects', [])
-                    matching_subject = next(
-                        (s for s in subjects if s.get('tutorSubjectId') == tutor_subject_id),
-                        None
-                    )
-
-                    if matching_subject:
-                        hourly_rate = matching_subject.get('hourlyRate', 0)
-                        enhanced_session['subjectName'] = matching_subject.get('subject', 'Unknown')
-                        enhanced_session['academicLevel'] = matching_subject.get('academicLevel', 'Unknown')
-                        duration_mins = session.get('durationMins', 0)
-                        if duration_mins and hourly_rate:
-                            enhanced_session['totalPrice'] = round(hourly_rate * (duration_mins / 60.0), 2)
-                        else:
-                            enhanced_session['totalPrice'] = 0.0
-                    else:
-                        enhanced_session['subjectName'] = 'Unknown'
-                        enhanced_session['academicLevel'] = 'Unknown'
-                        enhanced_session['totalPrice'] = 0.0
                 else:
                     enhanced_session['tutorName'] = 'Unknown'
                     enhanced_session['tutorImageUrl'] = None
-                    enhanced_session['subjectName'] = 'Unknown'
-                    enhanced_session['academicLevel'] = 'Unknown'
-                    enhanced_session['totalPrice'] = 0.0
             else:
                 enhanced_session['tutorName'] = 'Unknown'
                 enhanced_session['tutorImageUrl'] = None
-                enhanced_session['subjectName'] = 'Unknown'
-                enhanced_session['academicLevel'] = 'Unknown'
-                enhanced_session['totalPrice'] = 0.0
 
             enhanced_sessions.append(enhanced_session)
 
