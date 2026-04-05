@@ -174,6 +174,8 @@ STRIPE_PUBLISHABLE_KEY=
 STRIPE_SECRET_KEY=
 ```
 
+The required values are provided in the submitted `environment variables.txt` file.
+
 ### 3. Add Gmail credentials for the Email Service
 
 Place the provided `credentials.json` and `token.json` files at:
@@ -208,6 +210,8 @@ Fill in the required values:
 # Clerk (get this from your Clerk dashboard → API Keys)
 VITE_CLERK_PUBLISHABLE_KEY=
 ```
+
+The required values are provided in the submitted `environment variables.txt` file.
 
 ### 6. Start the frontend
 
