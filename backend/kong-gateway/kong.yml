@@ -201,6 +201,19 @@ services:
         methods: [GET, POST, PUT, DELETE, PATCH, OPTIONS]
         strip_path: true
 
+  - name: complete-session-service
+    url: http://complete-session:5108/complete-session
+    plugins:
+      - name: jwt
+        config: {key_claim_name: iss, claims_to_verify: [exp], anonymous: anonymous}
+      - name: acl
+        config: {allow: [authenticated], hide_groups_header: true}
+    routes:
+      - name: complete-session-route
+        paths: [/api/v1/complete-session]
+        methods: [GET, POST, OPTIONS]
+        strip_path: true
+
   - name: rate-tutor-service
     url: http://rate-tutor:5102/rate-tutor
     plugins:
