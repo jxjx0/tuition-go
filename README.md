@@ -174,7 +174,18 @@ STRIPE_PUBLISHABLE_KEY=
 STRIPE_SECRET_KEY=
 ```
 
-### 3. Start the backend
+### 3. Add Gmail credentials for the Email Service
+
+Place the provided `credentials.json` and `token.json` files at:
+
+```
+backend/atomic/email/credentials.json
+backend/atomic/email/token.json
+```
+
+> The required environment variable values for `backend/.env` and `frontend/tuition-go/.env.local` are provided in the submitted `environment variables.txt` file.
+
+### 4. Start the backend
 
 ```bash
 cd backend
@@ -183,7 +194,7 @@ docker compose up --build kong
 
 This starts all atomic and composite services, Kong API Gateway, and RabbitMQ. Kong Admin UI is available at `http://localhost:8002`.
 
-### 4. Configure frontend environment variables
+### 5. Configure frontend environment variables
 
 Create a `.env.local` file inside `frontend/tuition-go/`:
 
@@ -198,7 +209,7 @@ Fill in the required values:
 VITE_CLERK_PUBLISHABLE_KEY=
 ```
 
-### 5. Start the frontend
+### 6. Start the frontend
 
 ```bash
 cd frontend/tuition-go
