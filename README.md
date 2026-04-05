@@ -183,7 +183,7 @@ backend/atomic/email/credentials.json
 backend/atomic/email/token.json
 ```
 
-> The required environment variable values for `backend/.env` and `frontend/tuition-go/.env.local` are provided in the submitted `environment variables.txt` file.
+The required environment variable values for `backend/.env` and `frontend/tuition-go/.env.local` are provided in the submitted `environment variables.txt` file.
 
 ### 4. Start the backend
 
