@@ -27,7 +27,7 @@ const sessions = ref<any[]>([])
 const sessionsLoading = ref(true)
 const availableSessions = computed(() =>
   sessions.value
-    .filter(s => s.status === 'available')
+    .filter(s => s.status === 'available' && new Date(s.startTime + 'Z') >= new Date())
     .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
 )
 
