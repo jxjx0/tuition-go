@@ -200,7 +200,7 @@ const tutorStats = computed(() => [
           <p class="mt-1 text-base" style="color:#1B3A5C;opacity:0.6">Welcome back, {{ tutor?.name ?? 'Tutor' }}. Manage your sessions and availability.</p>
         </div>
         <div class="flex gap-4">
-          <button @click="showCreateSlot=!showCreateSlot" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90" style="background-color:#2EAA4F">+ Create Session Slot</button>
+          <button @click="showCreateSlot=!showCreateSlot" :disabled="sessionsLoading" class="px-6 py-3 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed" style="background-color:#2EAA4F">+ Create Session Slot</button>
         </div>
       </div>
 
