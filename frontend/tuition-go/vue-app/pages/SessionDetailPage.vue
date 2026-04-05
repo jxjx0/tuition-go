@@ -72,6 +72,10 @@ const booking = ref(false);
 
 async function bookSession() {
   if (!session.value || !currentStudentId.value) return;
+  if (new Date(session.value.startTime + 'Z') < new Date()) {
+    error.value = 'This session has already passed and cannot be booked.'
+    return
+  }
   booking.value = true;
   try {
     const { data } = await api.post("/checkout/checkout", {
@@ -492,7 +496,7 @@ onMounted(() => {
           <div class="flex flex-col sm:flex-row gap-3">
             <!-- Book Session -->
             <button
-              v-if="session.status === 'available' && userRole !== 'tutor'"
+              v-if="session.status === 'available' && userRole !== 'tutor' && new Date(session.startTime + 'Z') >= new Date()"
               @click="bookSession"
               :disabled="booking"
               class="flex-1 py-3 rounded-xl text-sm font-bold text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"

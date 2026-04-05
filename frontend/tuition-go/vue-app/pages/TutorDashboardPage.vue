@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+
+const today = new Date().toISOString().slice(0, 10)
 import { useUser } from '@clerk/vue'
 import { StarRating } from '../components'
 import { findTutorById } from "../composables/useTutors"
@@ -62,6 +64,10 @@ async function handleCreateSlot() {
   const durationMins = (new Date(endTime).getTime() - new Date(startTime).getTime()) / 60000
   if (durationMins <= 0) {
     slotError.value = 'End time must be after start time'
+    return
+  }
+  if (new Date(startTime) < new Date()) {
+    slotError.value = 'Session start time must be in the future'
     return
   }
 
@@ -226,7 +232,7 @@ const tutorStats = computed(() => [
           <!-- Date -->
           <div>
             <label class="text-xs font-semibold uppercase mb-1.5 block" style="color:#1B3A5C;opacity:0.5">Date</label>
-            <input v-model="slotForm.date" type="date" class="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none" style="border-color:#E8F0FE;color:#1B3A5C"/>
+            <input v-model="slotForm.date" type="date" :min="today" class="w-full px-4 py-2.5 rounded-xl text-sm border focus:outline-none" style="border-color:#E8F0FE;color:#1B3A5C"/>
           </div>
           <!-- Start time -->
           <div>
