@@ -81,24 +81,24 @@ Frontend (Vue 3)
 Kong API Gateway (:8000)
      │
      ├──► Atomic Services
-     │         student (:5001)
-     │         tutor (:5002)
-     │         session (:5003)
+     │         student  (:5001)
+     │         tutor    (:5002)
+     │         session  (:5003)
      │         calendar (:5005)  ──► Google Calendar API
-     │         email (:5006)     ◄── RabbitMQ
-     │         payment (:5007)   ──► Stripe
+     │         email    (:5006)  ◄── RabbitMQ
+     │         payment  (:5007)  ──► Stripe
      │
      └──► Composite Services
-               checkout (:5100)
-               cancel-session (:5101)
-               rate-tutor (:5102)
-               get-sessions (:5103)
-               process-booking (:5104)
-               create-session (:5105)
-               update-session (:5106)
-               delete-session (:5107)
-               complete-session (:5108)
-               get-tutor (:5109)
+               checkout         (:5100)  → session, tutor, student, payment
+               cancel-session   (:5101)  → session, tutor, student, calendar, payment  + RabbitMQ
+               rate-tutor       (:5102)  → session, tutor, review (OutSystems)
+               get-sessions     (:5103)  → session, tutor, student, review (OutSystems)
+               process-booking  (:5104)  → session, tutor, student, calendar, payment  + RabbitMQ
+               create-session   (:5105)  → session, calendar
+               update-session   (:5106)  → session, tutor, calendar
+               delete-session   (:5107)  → session, tutor, calendar
+               complete-session (:5108)  → session, tutor, student                     + RabbitMQ
+               get-tutor        (:5109)  → tutor, student, review (OutSystems)
 ```
 
 ---
@@ -236,4 +236,15 @@ The frontend will be available at `http://localhost:5173`.
 | complete-session | 5108 |
 | get-tutor | 5109 |
 
-Each service exposes Swagger docs at `http://localhost:<port>/docs`.
+---
+
+## Contributors
+
+| Name | Contributions |
+|---|---|
+| **Lek Jan Jin Lucas** | Frontend design, Calendar Service, Cancel Session Service |
+| **Soon Shi Heng Kevan** | Backend setup, Student Service, Cancel Session Service, Clerk Authentication |
+| **Chan Jing Xiang** | Frontend design, Checkout Service, Process Booking Service, Session Service |
+| **Aaralyn Chow Yuet Leng** | Tutor Service, Checkout Service |
+| **Fabian Reynadi Suwibowo** | Email Service, RabbitMQ, Rate Tutor Service |
+| **Liau Jun Rong (Jerome)** | Payment Service, Review Service (OutSystems), Rate Tutor Service |
