@@ -227,6 +227,8 @@ The frontend will be available at `http://localhost:5173`.
 
 ## Service Ports Reference
 
+> **Note:** Individual service ports are intentionally left exposed for testing and development purposes. Each service's API can be explored directly via its Swagger UI at `http://localhost:<port>/docs`. In production, these ports should be closed so that all traffic is routed exclusively through Kong (`:8000`).
+
 | Service | Port |
 |---|---|
 | Kong Proxy | 8000 |
